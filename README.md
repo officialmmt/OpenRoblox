@@ -25,12 +25,12 @@ This document contains the most up-to-date and actively maintained open-source l
 - Secure player data management.
 
 ### DataStore2
-- https://github.com/Kampfkarren/DataStore2  
+- https://kampfkarren.github.io/Roblox/
 - Enhanced alternative to the standard DataStore.
 
-### Ser
-- https://github.com/evaera/ser  
-- Serialization and deserialization for Roblox data.
+### Roblox Util
+- https://sleitnick.github.io/RbxUtil/  
+- Utility modules for Roblox
 
 ---
 
@@ -73,7 +73,7 @@ This document contains the most up-to-date and actively maintained open-source l
 - Input handling for all device types.
 
 ### Component
-- https://github.com/Sleitnick/Component  
+- https://sleitnick.github.io/RbxUtil/api/Component/ 
 - ECS architecture (Entity Component System).
 
 ### Loader
