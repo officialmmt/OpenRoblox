@@ -21,16 +21,12 @@ This document contains the most up-to-date and actively maintained open-source l
 ## 💾 Data Persistence Libraries
 
 ### ProfileService
-- https://github.com/MadStudioRoblox/ProfileService  
+- https://github.com/MadStudioRoblox/ProfileStore
 - Secure player data management.
 
 ### DataStore2
 - https://kampfkarren.github.io/Roblox/
 - Enhanced alternative to the standard DataStore.
-
-### Roblox Util
-- https://sleitnick.github.io/RbxUtil/  
-- Utility modules for Roblox
 
 ---
 
@@ -49,7 +45,7 @@ This document contains the most up-to-date and actively maintained open-source l
 - Physics-based UI and object animations.
 
 ### Plasma *(optional)*
-- https://github.com/AmaranthineCodices/plasma  
+- https://github.com/matter-ecs/plasma
 - Alternative reactive UI framework.
 
 ---
@@ -61,15 +57,15 @@ This document contains the most up-to-date and actively maintained open-source l
 - MVC architecture, service/controller structure.
 
 ### Red
-- https://github.com/Sleitnick/Red  
-- Type-safe system for RemoteEvents and RemoteFunctions.
+- https://github.com/dig1t/red
+- Event-driven server-to-client, client-to-server, and server-to-server communication.
 
 ### Trove
-- https://github.com/Sleitnick/Trove  
-- Memory management / cleanup helper.
+- https://sleitnick.github.io/RbxUtil/api/Trove/
+- Memory management/cleanup helper.
 
 ### Input
-- https://github.com/Sleitnick/Input  
+- https://sleitnick.github.io/RbxUtil/api/Input
 - Input handling for all device types.
 
 ### Component
@@ -77,7 +73,7 @@ This document contains the most up-to-date and actively maintained open-source l
 - ECS architecture (Entity Component System).
 
 ### Loader
-- https://github.com/Sleitnick/Loader  
+- https://sleitnick.github.io/RbxUtil/api/Loader/
 - Automatic module loader.
 
 ---
@@ -85,15 +81,15 @@ This document contains the most up-to-date and actively maintained open-source l
 ## 🎮 Utility & Extra Tools
 
 ### Signal
-- https://github.com/Sleitnick/Signal  
+- https://sleitnick.github.io/RbxUtil/api/Signal 
 - Lightweight event signaling system.
 
 ### Shake
-- https://github.com/Sleitnick/Shake  
+- https://sleitnick.github.io/RbxUtil/api/Shake
 - Camera and object shake effects.
 
 ### Timer
-- https://github.com/Sleitnick/Timer  
+- https://sleitnick.github.io/RbxUtil/api/Timer
 - Countdown and timed operations.
 
 ### Cmdr
@@ -101,7 +97,7 @@ This document contains the most up-to-date and actively maintained open-source l
 - Command system (for dev/admin commands).
 
 ### Matter
-- https://github.com/evaera/Matter  
+- https://github.com/matter-ecs/matter 
 - High-performance ECS-based framework.
 
 ### Promise
@@ -112,6 +108,14 @@ This document contains the most up-to-date and actively maintained open-source l
 - https://1foreverhd.github.io/TopbarPlus/
 - https://github.com/1ForeverHD/TopbarPlus
 - Construct dynamic and intuitive topbar icons. Enhance the appearance and behaviour of these icons with features such as themes, dropdowns, and menus.
+
+### Rodux
+- https://github.com/Roblox/rodux
+- A state management library
+
+### Roblox Util
+- https://sleitnick.github.io/RbxUtil/  
+- Utility modules for Roblox
   
 ---
 ## 👜 Backpack Systems
@@ -132,10 +136,6 @@ This document contains the most up-to-date and actively maintained open-source l
 ### TestEZ
 - https://github.com/Roblox/testez  
 - Unit testing framework for Roblox Lua.
-
-### Rubric
-- https://github.com/EgoMoose/rubric  
-- Benchmarking and performance testing.
 
 ### t
 - https://github.com/osyrisrblx/t  
