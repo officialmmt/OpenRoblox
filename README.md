@@ -117,7 +117,7 @@ This document contains the most up-to-date and actively maintained open-source l
 - https://sleitnick.github.io/RbxUtil/  
 - Utility modules for Roblox
   
-### Roblox Util
+### Selene
 - https://github.com/Kampfkarren/selene
 - A blazing-fast modern Lua linter
 
