@@ -84,9 +84,9 @@ This document contains the most up-to-date and actively maintained open-source l
 - https://sleitnick.github.io/RbxUtil/api/Signal 
 - Lightweight event signaling system.
 
-### Shake
-- https://sleitnick.github.io/RbxUtil/api/Shake
-- Camera and object shake effects.
+### Camera Shake
+- https://github.com/Sleitnick/RbxCameraShaker
+- Camera shake effects for Roblox games
 
 ### Timer
 - https://sleitnick.github.io/RbxUtil/api/Timer
