@@ -44,6 +44,10 @@ This document contains the most up-to-date and actively maintained open-source l
 - https://github.com/Reselim/Flipper  
 - Physics-based UI and object animations.
 
+### ezVisualz 
+- https://github.com/arxkdev/ezVisualz
+- UIGradient and UIStroke effects made easy!
+
 ### Plasma *(optional)*
 - https://github.com/matter-ecs/plasma
 - Alternative reactive UI framework.
