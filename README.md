@@ -171,6 +171,19 @@ This document contains the most up-to-date and actively maintained open-source l
 
 ---
 
-This list is open to contributions. New resources may be added and updates are made regularly.
+## 🏛️ Building Demo and Libraries
+
+### Alpha Strike Group
+- https://www.roblox.com/share/g/6821794
+- Roblox building kits and demos from Roblox Employee
+
+---
+
+# Calestial Oasis Studios
+- https://www.roblox.com/communities/112595488/Celestial-Oasis-Studios#!/about
+- Join Us To Support Our Work
+
+---
+This list is open to contributions. New resources may be added, and updates are made regularly.
 
 
