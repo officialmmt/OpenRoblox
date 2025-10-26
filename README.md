@@ -179,7 +179,7 @@ This document contains the most up-to-date and actively maintained open-source l
 
 ---
 
-# Calestial Oasis Studios
+# Celestial Oasis Studios
 - https://www.roblox.com/communities/112595488/Celestial-Oasis-Studios#!/about
 - Join Us To Support Our Work
 
