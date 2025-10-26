@@ -177,6 +177,9 @@ This document contains the most up-to-date and actively maintained open-source l
 - https://www.roblox.com/share/g/6821794
 - Roblox building kits and demos from Roblox Employee
 
+### Building kit for Classic era builds
+- https://devforum.roblox.com/t/building-kit-for-classic-era-builds/2759949
+
 ---
 
 # Celestial Oasis Studios
