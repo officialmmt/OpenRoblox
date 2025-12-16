@@ -4,6 +4,23 @@ This document contains the most up-to-date and actively maintained open-source l
 
 ---
 
+### 🏟️ Roblox Studio Plugins
+
+## Auto complete/import Modules & Services
+- https://devforum.roblox.com/t/auto-completeimport-modules-services/2687000?u=pr0qmr
+
+---
+
+## 🧾 Modules
+
+### LeaderstatsList - Type Heavy ‘leaderstats’ Creation Class
+- https://devforum.roblox.com/t/leaderstatslist-type-heavy-leaderstats-creation-class/3810455?u=pr0qmr
+
+### Fastcast
+- https://etithespir.it/FastCastAPIDocs/
+
+---
+
 ## 🔧 Core Tools
 
 ### Rojo (Project Synchronization)
@@ -18,6 +35,29 @@ This document contains the most up-to-date and actively maintained open-source l
 
 ---
 
+## ✍️ Rojo Intelisenses
+
+### Roblox LSP
+- Full Intellisense for Roblox and Luau!
+- https://devforum.roblox.com/t/roblox-lsp-full-intellisense-for-roblox-and-luau/717745?u=pr0qmr
+
+---
+
+## 🧹 Cleaners
+
+### Janitor
+- https://howmanysmall.github.io/Janitor/
+- Garbage collector object implementation for Roblox
+
+### Trove
+- https://sleitnick.github.io/RbxUtil/api/Trove/
+- Memory management/cleanup helper.
+
+### Maid
+- https://devsparkle.me/Maid/
+
+---
+
 ## 💾 Data Persistence Libraries
 
 ### ProfileService
@@ -28,6 +68,29 @@ This document contains the most up-to-date and actively maintained open-source l
 - https://kampfkarren.github.io/Roblox/
 - Enhanced alternative to the standard DataStore.
 
+### Suphi's Datastore
+- https://devforum.roblox.com/t/suphis-datastore-module/2425597?u=pr0qmr
+
+---
+
+## 📨 Communication RbxSignals
+
+
+### Signal
+- **Lightweight event signaling system.**
+- https://sleitnick.github.io/RbxUtil/api/Signal 
+- **Signal+ | Exceptionally fast signal library**
+- https://devforum.roblox.com/t/signal-exceptionally-fast-signal-library/3552231
+- **FastSignal - A consistent signal library**
+- https://devforum.roblox.com/t/fastsignal-a-consistent-signal-library/1360042/20?u=pr0qmr 
+
+### Packet
+- https://devforum.roblox.com/t/packet-networking-library/3573907?u=pr0qmr
+
+### Red
+- https://github.com/dig1t/red
+- Event-driven server-to-client, client-to-server, and server-to-server communication.
+  
 ---
 
 ## 🎨 UI & Animation Frameworks
@@ -54,19 +117,18 @@ This document contains the most up-to-date and actively maintained open-source l
 
 ---
 
-## 🚀 Most Popular Libraries
+## 🧱 Frameworks
 
 ### Knit
 - https://github.com/Sleitnick/Knit  
 - MVC architecture, service/controller structure.
 
-### Red
-- https://github.com/dig1t/red
-- Event-driven server-to-client, client-to-server, and server-to-server communication.
+### Volt - An efficient & powerful game framework
+- https://devforum.roblox.com/t/volt-an-efficient-powerful-game-framework/1265274?u=pr0qmr
 
-### Trove
-- https://sleitnick.github.io/RbxUtil/api/Trove/
-- Memory management/cleanup helper.
+---
+
+## 🚀 Most Popular Libraries
 
 ### Input
 - https://sleitnick.github.io/RbxUtil/api/Input
@@ -76,19 +138,36 @@ This document contains the most up-to-date and actively maintained open-source l
 - https://sleitnick.github.io/RbxUtil/api/Component/ 
 - ECS architecture (Entity Component System).
 
+---
+
+## ⚡ Loaders
+
 ### Loader
 - https://sleitnick.github.io/RbxUtil/api/Loader/
 - Automatic module loader.
 
+### Nevermore
+- https://quenty.github.io/NevermoreEngine/
+
 ---
 
-## 🎮 Utility & Extra Tools
+## 🎮 Utility & Extra Poweful Tools
 
-### Signal
-- https://sleitnick.github.io/RbxUtil/api/Signal 
-- Lightweight event signaling system.
-- Also another latest version Signal+
-- https://devforum.roblox.com/t/signal-exceptionally-fast-signal-library/3552231
+### Documentation Reader - A Plugin for Scripters!
+- https://devforum.roblox.com/t/documentation-reader-a-plugin-for-scripters/128825?u=pr0qmr
+
+### Wallet - Advanced currency management framework
+- https://devforum.roblox.com/t/wallet-advanced-currency-management-framework/4071371?u=pr0qmr
+
+### Replica
+- https://devforum.roblox.com/t/replica-server-to-client-state-replication-module/3216980
+- Replica is a Roblox server to client state replication solution which lets the developer subscribe certain players to certain states.
+
+### ZonePlus v4 (Modernized API)
+- https://devforum.roblox.com/t/zoneplus-v320-construct-dynamic-zones-and-effectively-determine-players-and-parts-within-their-boundaries/1017701/821?u=pr0qmr
+- Also old version v3.2
+- https://devforum.roblox.com/t/zoneplus-v320-construct-dynamic-zones-and-effectively-determine-players-and-parts-within-their-boundaries/1017701?u=pr0qmr
+- Construct dynamic zones that utilise region checking, raycasting and the new BasePart.CanTouch property to effectively determine players and parts within their boundaries.
 
 ### Camera Shake
 - https://github.com/Sleitnick/RbxCameraShaker
