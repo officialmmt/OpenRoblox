@@ -110,7 +110,7 @@ This document contains the most up-to-date and actively maintained open-source l
 - https://github.com/evaera/roblox-lua-promise  
 - Asynchronous control structure (ideal for APIs, delays, etc.).
 
-### TopBarPlus V3
+### TopBarPlus
 - https://1foreverhd.github.io/TopbarPlus/
 - https://github.com/1ForeverHD/TopbarPlus
 - Construct dynamic and intuitive topbar icons. Enhance the appearance and behaviour of these icons with features such as themes, dropdowns, and menus.
