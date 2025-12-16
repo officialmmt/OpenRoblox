@@ -87,6 +87,8 @@ This document contains the most up-to-date and actively maintained open-source l
 ### Signal
 - https://sleitnick.github.io/RbxUtil/api/Signal 
 - Lightweight event signaling system.
+- Also another latest version Signal+
+- https://devforum.roblox.com/t/signal-exceptionally-fast-signal-library/3552231
 
 ### Camera Shake
 - https://github.com/Sleitnick/RbxCameraShaker
