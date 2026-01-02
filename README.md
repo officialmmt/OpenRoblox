@@ -1,4 +1,4 @@
-# 🧰 OpenRoblox – 2026 Updated Library and Tool List
+00# 🧰 OpenRoblox – 2026 Updated Library and Tool List
 
 This document contains the most up-to-date and actively maintained open-source libraries, developer tools, and resources for Roblox developers as of 2025.
 
@@ -7,14 +7,14 @@ This document contains the most up-to-date and actively maintained open-source l
 ### 🏟️ Roblox Studio Plugins
 
 ## Auto complete/import Modules & Services
-- https://devforum.roblox.com/t/auto-completeimport-modules-services/2687000?u=pr0qmr
+- https://devforum.roblox.com/t/auto-completeimport-modules-services/2687000
 
 ---
 
 ## 🧾 Modules
 
 ### LeaderstatsList - Type Heavy ‘leaderstats’ Creation Class
-- https://devforum.roblox.com/t/leaderstatslist-type-heavy-leaderstats-creation-class/3810455?u=pr0qmr
+- https://devforum.roblox.com/t/leaderstatslist-type-heavy-leaderstats-creation-class/3810455
 
 ### Fastcast
 - https://etithespir.it/FastCastAPIDocs/
@@ -39,7 +39,7 @@ This document contains the most up-to-date and actively maintained open-source l
 
 ### Roblox LSP
 - Full Intellisense for Roblox and Luau!
-- https://devforum.roblox.com/t/roblox-lsp-full-intellisense-for-roblox-and-luau/717745?u=pr0qmr
+- https://devforum.roblox.com/t/roblox-lsp-full-intellisense-for-roblox-and-luau/717745
 
 ---
 
@@ -69,7 +69,7 @@ This document contains the most up-to-date and actively maintained open-source l
 - Enhanced alternative to the standard DataStore.
 
 ### Suphi's Datastore
-- https://devforum.roblox.com/t/suphis-datastore-module/2425597?u=pr0qmr
+- https://devforum.roblox.com/t/suphis-datastore-module/2425597
 
 ---
 
@@ -82,10 +82,10 @@ This document contains the most up-to-date and actively maintained open-source l
 - **Signal+ | Exceptionally fast signal library**
 - https://devforum.roblox.com/t/signal-exceptionally-fast-signal-library/3552231
 - **FastSignal - A consistent signal library**
-- https://devforum.roblox.com/t/fastsignal-a-consistent-signal-library/1360042/20?u=pr0qmr 
+- https://devforum.roblox.com/t/fastsignal-a-consistent-signal-library/1360042/20 
 
 ### Packet
-- https://devforum.roblox.com/t/packet-networking-library/3573907?u=pr0qmr
+- https://devforum.roblox.com/t/packet-networking-library/3573907
 
 ### Red
 - https://github.com/dig1t/red
@@ -124,7 +124,7 @@ This document contains the most up-to-date and actively maintained open-source l
 - MVC architecture, service/controller structure.
 
 ### Volt - An efficient & powerful game framework
-- https://devforum.roblox.com/t/volt-an-efficient-powerful-game-framework/1265274?u=pr0qmr
+- https://devforum.roblox.com/t/volt-an-efficient-powerful-game-framework/1265274
 
 ---
 
@@ -154,19 +154,19 @@ This document contains the most up-to-date and actively maintained open-source l
 ## 🎮 Utility & Extra Poweful Tools
 
 ### Documentation Reader - A Plugin for Scripters!
-- https://devforum.roblox.com/t/documentation-reader-a-plugin-for-scripters/128825?u=pr0qmr
+- https://devforum.roblox.com/t/documentation-reader-a-plugin-for-scripters/128825
 
 ### Wallet - Advanced currency management framework
-- https://devforum.roblox.com/t/wallet-advanced-currency-management-framework/4071371?u=pr0qmr
+- https://devforum.roblox.com/t/wallet-advanced-currency-management-framework/4071371
 
 ### Replica
 - https://devforum.roblox.com/t/replica-server-to-client-state-replication-module/3216980
 - Replica is a Roblox server to client state replication solution which lets the developer subscribe certain players to certain states.
 
 ### ZonePlus v4 (Modernized API)
-- https://devforum.roblox.com/t/zoneplus-v320-construct-dynamic-zones-and-effectively-determine-players-and-parts-within-their-boundaries/1017701/821?u=pr0qmr
+- https://devforum.roblox.com/t/zoneplus-v320-construct-dynamic-zones-and-effectively-determine-players-and-parts-within-their-boundaries/1017701/821
 - Also old version v3.2
-- https://devforum.roblox.com/t/zoneplus-v320-construct-dynamic-zones-and-effectively-determine-players-and-parts-within-their-boundaries/1017701?u=pr0qmr
+- https://devforum.roblox.com/t/zoneplus-v320-construct-dynamic-zones-and-effectively-determine-players-and-parts-within-their-boundaries/1017701
 - Construct dynamic zones that utilise region checking, raycasting and the new BasePart.CanTouch property to effectively determine players and parts within their boundaries.
 
 ### Camera Shake
