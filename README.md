@@ -1,4 +1,4 @@
-00# 🧰 OpenRoblox – 2026 Updated Library and Tool List
+# 🧰 OpenRoblox – 2026 Updated Library and Tool List
 
 This document contains the most up-to-date and actively maintained open-source libraries, developer tools, and resources for Roblox developers as of 2025.
 
