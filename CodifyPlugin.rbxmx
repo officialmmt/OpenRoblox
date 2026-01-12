@@ -1,0 +1,6434 @@
+<roblox version="4">
+  <Item class="Script" referent="0">
+    <Properties>
+      <string name="Name">CodifyPlugin</string>
+      <token name="RunContext">0</token>
+      <string name="Source"><![CDATA[local PluginDebugService = game:GetService("PluginDebugService")
+
+local Roact = require(script.Packages.Roact)
+local RoduxHooks = require(script.Packages.RoduxHooks)
+local Rodux = require(script.Packages.Rodux)
+
+local UserSettingsManager = require(script.Lib.UserSettingsManager)
+local HighlighterManager = require(script.Lib.HighlighterManager)
+local SelectionManager = require(script.Lib.SelectionManager)
+
+local AppComponent = require(script.Components.App)
+
+local Reducer = require(script.Reducer)
+local Actions = require(script.Actions)
+local Thunks = require(script.Thunks)
+
+local store = Rodux.Store.new(Reducer, nil, {
+	Rodux.thunkMiddleware,
+})
+
+if plugin.Parent == PluginDebugService then
+	Roact.setGlobalConfig({
+		elementTracing = true,
+	})
+end
+
+UserSettingsManager.new(plugin, store)
+HighlighterManager.new(plugin)
+
+do -- Handle Selection --
+	local selection = SelectionManager.new(plugin, {
+		classFilter = {
+			function(selection: Instance)
+				return selection.Parent ~= game
+			end,
+
+			function(selection: Instance)
+				local ok = pcall(function()
+					local new = Instance.new(selection.ClassName)
+					new:Destroy()
+				end)
+
+				return ok
+			end,
+		},
+	})
+
+	store:dispatch(Actions.SetTargetInstance(selection:GetCurrentSelection()))
+
+	selection.Changed:Connect(function(selection)
+		store:dispatch(Actions.SetTargetInstance(selection))
+	end)
+end
+
+do -- Create PluginAction --
+	local action = plugin:CreatePluginAction(
+		"codifyGenerateSnippet",
+		"Codify (Generate)",
+		"Generate a snippet in Codify for the current selection",
+		"rbxassetid://8730522354",
+		true
+	)
+
+	action.Triggered:Connect(function()
+		store:dispatch(Thunks.GenerateSnippet())
+	end)
+end
+
+do -- Mount app --
+	store:dispatch(Thunks.DeterminePluginMetadata(plugin))
+
+	local rootComponent = Roact.createElement(RoduxHooks.Provider, {
+		store = store,
+	}, {
+		app = Roact.createElement(AppComponent, {
+			plugin = plugin,
+		}),
+	})
+
+	local handle = Roact.mount(rootComponent, nil, "Codify")
+
+	plugin.Unloading:Connect(function()
+		Roact.unmount(handle)
+	end)
+end
+]]></string>
+    </Properties>
+    <Item class="ModuleScript" referent="1">
+      <Properties>
+        <string name="Name">Actions</string>
+        <string name="Source"><![CDATA[return {
+	SetAuthors = require(script.SetAuthors),
+	SetContributors = require(script.SetContributors),
+	SetPluginMetadata = require(script.SetPluginMetadata),
+	SetSetting = require(script.SetSetting),
+	SetSnippetContent = require(script.SetSnippetContent),
+	SetSnippetError = require(script.SetSnippetError),
+	SetSnippetProcessing = require(script.SetSnippetProcessing),
+	SetTargetInstance = require(script.SetTargetInstance),
+}
+]]></string>
+      </Properties>
+      <Item class="ModuleScript" referent="2">
+        <Properties>
+          <string name="Name">SetAuthors</string>
+          <string name="Source"><![CDATA[return function(authors: { string })
+	return {
+		type = "SET_AUTHORS",
+		payload = authors,
+	}
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="3">
+        <Properties>
+          <string name="Name">SetContributors</string>
+          <string name="Source"><![CDATA[return function(contributors: { string })
+	return {
+		type = "SET_CONTRIBUTORS",
+		payload = contributors,
+	}
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="4">
+        <Properties>
+          <string name="Name">SetPluginMetadata</string>
+          <string name="Source"><![CDATA[export type IOptions = {
+	isDevMode: boolean?,
+	build: string?,
+}
+
+return function(options: IOptions)
+	return {
+		type = "SET_PLUGIN_METADATA",
+		payload = options,
+	}
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="5">
+        <Properties>
+          <string name="Name">SetSetting</string>
+          <string name="Source"><![CDATA[export type SetSettingsEnumPayload = {
+	key: string,
+	value: any,
+}
+
+return function(payload: SetSettingsEnumPayload)
+	return {
+		type = "SET_SETTING",
+		payload = payload,
+	}
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="6">
+        <Properties>
+          <string name="Name">SetSnippetContent</string>
+          <string name="Source"><![CDATA[type SetSnippetContentPayload = {
+	content: string,
+	name: string,
+}
+
+return function(content: SetSnippetContentPayload)
+	return {
+		type = "SET_SNIPPET_CONTENT",
+		payload = content,
+	}
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="7">
+        <Properties>
+          <string name="Name">SetSnippetError</string>
+          <string name="Source"><![CDATA[return function(errorText: string | nil)
+	return {
+		type = "SET_SNIPPET_ERROR",
+		payload = errorText,
+	}
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="8">
+        <Properties>
+          <string name="Name">SetSnippetProcessing</string>
+          <string name="Source"><![CDATA[return function(processing: boolean)
+	return {
+		type = "SET_SNIPPET_PROCESSING",
+		payload = processing,
+	}
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="9">
+        <Properties>
+          <string name="Name">SetTargetInstance</string>
+          <string name="Source"><![CDATA[return function(target: Instance?)
+	return {
+		type = "SET_TARGET_INSTANCE",
+		payload = target,
+	}
+end
+]]></string>
+        </Properties>
+      </Item>
+    </Item>
+    <Item class="Folder" referent="10">
+      <Properties>
+        <string name="Name">Components</string>
+      </Properties>
+      <Item class="ModuleScript" referent="11">
+        <Properties>
+          <string name="Name">Alert</string>
+          <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local Hooks = require(Packages.Hooks)
+local StudioTheme = require(Packages.StudioTheme)
+local Sift = require(Packages.Sift)
+
+local Icon = require(script.Parent.Icon)
+local Text = require(script.Parent.Text)
+local JustifyFrame = require(script.Parent.JustifyFrame)
+
+local e = Roact.createElement
+
+export type AlertProps = {
+	order: number?,
+	zindex: number?,
+	variant: Enum.MessageType?,
+	label: string,
+	icon: string?,
+}
+
+local variantMap = {
+	[Enum.MessageType.MessageInfo] = {
+		background = Enum.StudioStyleGuideColor.DialogMainButton,
+		text = Enum.StudioStyleGuideColor.DialogMainButtonText,
+	},
+	[Enum.MessageType.MessageWarning] = {
+		background = Enum.StudioStyleGuideColor.WarningText,
+		text = Enum.StudioStyleGuideColor.DialogMainButtonText,
+	},
+	[Enum.MessageType.MessageError] = {
+		background = Enum.StudioStyleGuideColor.ErrorText,
+		text = Enum.StudioStyleGuideColor.DialogMainButtonText,
+	},
+	[Enum.MessageType.MessageOutput] = {
+		background = Enum.StudioStyleGuideColor.SensitiveText,
+		text = Enum.StudioStyleGuideColor.DialogMainButtonText,
+	},
+}
+
+local function Alert(props: AlertProps, hooks)
+	local theme, styles = StudioTheme.useTheme(hooks)
+	local variant = variantMap[props.variant]
+
+	local hasChildren = hooks.useMemo(function()
+		if not props[Roact.Children] then
+			return false
+		end
+
+		return Sift.Dictionary.count(props[Roact.Children]) > 0
+	end, { props[Roact.Children] })
+
+	return e("Frame", {
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		LayoutOrder = props.order,
+		Size = UDim2.fromScale(1, 0),
+		ZIndex = props.zindex,
+	}, {
+		layout = e("UIListLayout", {
+			FillDirection = Enum.FillDirection.Vertical,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 2),
+		}),
+
+		content = e("Frame", {
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundColor3 = theme:GetColor(variant.background),
+			Size = UDim2.fromScale(1, 0),
+			LayoutOrder = 100,
+		}, {
+			corners = e("UICorner", {
+				CornerRadius = UDim.new(0, styles.borderRadius),
+			}),
+
+			content = e("Frame", {
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				Size = UDim2.fromScale(1, 0),
+			}, {
+				padding = e("UIPadding", {
+					PaddingBottom = UDim.new(0, styles.spacing),
+					PaddingLeft = UDim.new(0, styles.spacing),
+					PaddingRight = UDim.new(0, styles.spacing),
+					PaddingTop = UDim.new(0, styles.spacing),
+				}),
+
+				content = e("Frame", {
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					Size = UDim2.fromScale(1, 0),
+					LayoutOrder = 100,
+				}, {
+					layout = e("UIListLayout", {
+						Padding = UDim.new(0, styles.spacing),
+						FillDirection = Enum.FillDirection.Horizontal,
+						SortOrder = Enum.SortOrder.LayoutOrder,
+					}),
+
+					padding = e("UIPadding", {
+						PaddingRight = UDim.new(0, 20),
+					}),
+
+					icon = if props.icon
+						then e(Icon, {
+							icon = props.icon,
+							color = theme:GetColor(variant.text),
+						})
+						else nil,
+
+					label = e(Text, {
+						text = props.label,
+						textColor = theme:GetColor(variant.text),
+						autoSize = Enum.AutomaticSize.Y,
+						size = UDim2.fromScale(1, 0),
+					}),
+				}),
+			}),
+		}),
+
+		actions = if hasChildren
+			then e(JustifyFrame, {
+				autoSize = Enum.AutomaticSize.Y,
+				size = UDim2.fromScale(1, 0),
+				order = 200,
+				gap = 2,
+				direction = Enum.FillDirection.Horizontal,
+				alignY = Enum.VerticalAlignment.Top,
+				alignX = Enum.HorizontalAlignment.Center,
+			}, props[Roact.Children])
+			else nil,
+	})
+end
+
+return Hooks.new(Roact)(Alert, {
+	defaultProps = {
+		variant = Enum.MessageType.MessageInfo,
+	},
+})
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="12">
+        <Properties>
+          <string name="Name">App</string>
+          <string name="Source"><![CDATA[local Plugin = script.Parent.Parent
+
+local StudioPlugin = require(Plugin.Packages.StudioPlugin)
+local StudioTheme = require(Plugin.Packages.StudioTheme)
+local RoduxHooks = require(Plugin.Packages.RoduxHooks)
+local Roact = require(Plugin.Packages.Roact)
+local Hooks = require(Plugin.Packages.Hooks)
+
+local Config = require(Plugin.Data.Config)
+
+local Routing = require(Plugin.Components.Routing)
+
+local e = Roact.createElement
+
+type AppProps = {
+	plugin: Plugin,
+}
+
+local function App(props: AppProps, hooks)
+	local widgetVisible, setWidgetVisible = hooks.useState(true)
+
+	local pluginMeta = RoduxHooks.useSelector(hooks, function(state)
+		return state.pluginMeta
+	end)
+
+	local buttonSuffix = hooks.useMemo(function()
+		if pluginMeta.build ~= "STABLE" then
+			return " [" .. pluginMeta.build .. "]"
+		end
+
+		return ""
+	end, { pluginMeta })
+
+	return e(StudioPlugin.Plugin, {
+		plugin = props.plugin,
+	}, {
+		toolbar = e(StudioPlugin.Toolbar, {
+			name = "Codify",
+		}, {
+			widgetToggle = e(StudioPlugin.ToolbarButton, {
+				id = "widgetToggle",
+				tooltip = "Show or hide the Codify widget",
+				icon = Config.icons.stable,
+				label = "Codify" .. buttonSuffix,
+				active = widgetVisible,
+				onActivated = function()
+					setWidgetVisible(not widgetVisible)
+				end,
+			}),
+		}),
+
+		widget = e(StudioPlugin.Widget, {
+			id = "CodifyWidget",
+			initState = Enum.InitialDockState.Left,
+			enabled = widgetVisible,
+			title = "Codify" .. buttonSuffix,
+
+			onInit = setWidgetVisible,
+			onToggle = setWidgetVisible,
+		}, {
+			themeProvider = e(StudioTheme.Provider, {
+				styles = {
+					font = {
+						default = Enum.Font.Gotham,
+						semibold = Enum.Font.GothamMedium,
+						bold = Enum.Font.GothamBold,
+						black = Enum.Font.GothamBlack,
+						mono = Enum.Font.Code,
+					},
+				},
+			}, {
+				routing = widgetVisible and e(Routing),
+			}),
+		}),
+	})
+end
+
+return Hooks.new(Roact)(App)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="13">
+        <Properties>
+          <string name="Name">Button</string>
+          <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local Hooks = require(Packages.Hooks)
+local StudioTheme = require(Packages.StudioTheme)
+
+local Layout = require(script.Parent.Layout)
+local Text = require(script.Parent.Text)
+local Icon = require(script.Parent.Icon)
+
+local e = Roact.createElement
+
+export type ButtonProps = {
+	autoSize: Enum.AutomaticSize?,
+	primary: boolean?,
+	disabled: boolean?,
+	label: string?,
+	hint: string?,
+	icon: string?,
+	iconPosition: string?,
+	size: UDim2?,
+	alignX: Enum.HorizontalAlignment?,
+	position: UDim2?,
+	zindex: number?,
+	order: number?,
+	onActivated: ((ImageButton) -> ())?,
+}
+
+local function Button(props: ButtonProps, hooks)
+	local theme, styles = StudioTheme.useTheme(hooks)
+
+	local hover, setHover = hooks.useState(false)
+	local press, setPress = hooks.useState(false)
+
+	local buttonStyles = {
+		modifiers = {},
+		colors = {
+			background = if props.primary
+				then Enum.StudioStyleGuideColor.DialogMainButton
+				else Enum.StudioStyleGuideColor.Button,
+			foreground = if props.primary
+				then Enum.StudioStyleGuideColor.DialogMainButtonText
+				else Enum.StudioStyleGuideColor.ButtonText,
+			border = if props.primary
+				then Enum.StudioStyleGuideColor.DialogButtonBorder
+				else Enum.StudioStyleGuideColor.ButtonBorder,
+		},
+	}
+
+	if props.disabled then
+		buttonStyles.modifiers.background = Enum.StudioStyleGuideModifier.Disabled
+	elseif press then
+		buttonStyles.modifiers.background = Enum.StudioStyleGuideModifier.Pressed
+	elseif hover then
+		buttonStyles.modifiers.background = Enum.StudioStyleGuideModifier.Hover
+	end
+
+	if not buttonStyles.modifiers.foreground then
+		buttonStyles.modifiers.foreground = buttonStyles.modifiers.background
+	end
+
+	local onInputBegan = hooks.useCallback(function(_, input: InputObject)
+		if props.disabled then
+			return
+		end
+
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			setHover(true)
+		elseif input.UserInputType.Name:match("MouseButton%d+") then
+			setPress(true)
+		end
+	end, { props.disabled })
+
+	local function onInputEnded(_, input: InputObject)
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			setHover(false)
+			setPress(false)
+		elseif input.UserInputType.Name:match("MouseButton%d+") then
+			setPress(false)
+		end
+	end
+
+	local autoSizeProps = hooks.useMemo(function()
+		local full = props.autoSize == Enum.AutomaticSize.XY
+
+		return {
+			autoSize = if full then Enum.AutomaticSize.XY else Enum.AutomaticSize.Y,
+			size = if full then UDim2.new() else UDim2.fromScale(1, 1),
+		}
+	end, { props.autoSize })
+
+	return e("ImageButton", {
+		AutoButtonColor = false,
+		AutomaticSize = props.autoSize,
+		BackgroundColor3 = theme:GetColor(buttonStyles.colors.border, buttonStyles.modifiers.background),
+		Position = props.position,
+		LayoutOrder = props.order,
+		Size = props.size,
+		ZIndex = props.zindex,
+		Image = "",
+
+		[Roact.Event.InputBegan] = onInputBegan,
+		[Roact.Event.InputEnded] = onInputEnded,
+		[Roact.Event.Activated] = props.onActivated,
+	}, {
+		corners = e(Layout.Corner),
+		padding = e(Layout.Padding, { 1 }),
+
+		content = e("Frame", {
+			AutomaticSize = autoSizeProps.autoSize,
+			BackgroundColor3 = theme:GetColor(buttonStyles.colors.background, buttonStyles.modifiers.background),
+			Size = autoSizeProps.size,
+			ClipsDescendants = true,
+		}, {
+			padding = e(Layout.Padding),
+
+			corners = e(Layout.Corner, {
+				radius = styles.borderRadius - 1,
+			}),
+
+			layout = e(Layout.ListLayout, {
+				alignY = Enum.VerticalAlignment.Center,
+				alignX = props.alignX,
+			}),
+
+			icon = if props.icon
+				then e(Icon, {
+					icon = props.icon,
+					order = if props.iconPosition == "end" then 40 else 10,
+					color = theme:GetColor(buttonStyles.colors.foreground, buttonStyles.modifiers.foreground),
+					size = 16,
+				})
+				else nil,
+
+			label = e(Text, {
+				autoSize = Enum.AutomaticSize.XY,
+				text = props.label,
+				textColor = theme:GetColor(buttonStyles.colors.foreground, buttonStyles.modifiers.foreground),
+				alignX = Enum.TextXAlignment.Center,
+				alignY = Enum.TextYAlignment.Center,
+				size = UDim2.new(),
+				order = 20,
+			}),
+
+			hint = if props.hint
+				then e(Text, {
+					autoSize = Enum.AutomaticSize.XY,
+					text = props.hint,
+					textColor = theme:GetColor(
+						Enum.StudioStyleGuideColor.DimmedText,
+						buttonStyles.modifiers.foreground
+					),
+					alignX = Enum.TextXAlignment.Center,
+					alignY = Enum.TextYAlignment.Center,
+					size = UDim2.new(),
+					visible = false,
+					order = 30,
+				})
+				else nil,
+		}),
+	})
+end
+
+return Hooks.new(Roact)(Button, {
+	defaultProps = {
+		autoSize = Enum.AutomaticSize.XY,
+		alignX = Enum.HorizontalAlignment.Center,
+	},
+})
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="14">
+        <Properties>
+          <string name="Name">Checkbox</string>
+          <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local Hooks = require(Packages.Hooks)
+local StudioTheme = require(Packages.StudioTheme)
+
+local Layout = require(script.Parent.Layout)
+local Text = require(script.Parent.Text)
+
+local BaseCheckbox = require(script.BaseCheckbox)
+
+local e = Roact.createElement
+
+export type CheckboxProps = {
+	disabled: boolean?,
+	emphasised: boolean?,
+	order: number?,
+	label: string?,
+	hint: string?,
+	value: boolean?,
+	onChanged: ((value: boolean) -> ())?,
+}
+
+local function Checkbox(props: CheckboxProps, hooks)
+	local theme, styles = StudioTheme.useTheme(hooks)
+
+	local hover, setHover = hooks.useState(false)
+	local press, setPress = hooks.useState(false)
+
+	local modifier = if props.disabled
+		then Enum.StudioStyleGuideModifier.Disabled
+		elseif press then Enum.StudioStyleGuideModifier.Pressed
+		elseif hover then Enum.StudioStyleGuideModifier.Hover
+		else nil
+
+	local onActivated = hooks.useCallback(function()
+		if props.onChanged then
+			props.onChanged(not props.value)
+		end
+	end, { props.onChanged, props.value })
+
+	local onInputBegan = hooks.useCallback(function(_, input: InputObject)
+		if props.disabled then
+			return
+		end
+
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			setHover(true)
+		elseif input.UserInputType.Name:match("MouseButton%d+") then
+			setPress(true)
+		end
+	end, { props.disabled })
+
+	local function onInputEnded(_, input: InputObject)
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			setHover(false)
+			setPress(false)
+		elseif input.UserInputType.Name:match("MouseButton%d+") then
+			setPress(false)
+		end
+	end
+
+	return e("ImageButton", {
+		Active = not props.disabled,
+		AutoButtonColor = false,
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		LayoutOrder = props.order,
+		Selectable = not props.disabled,
+		Size = UDim2.fromScale(1, 0),
+
+		[Roact.Event.Activated] = onActivated,
+		[Roact.Event.InputBegan] = onInputBegan,
+		[Roact.Event.InputEnded] = onInputEnded,
+	}, {
+		checkbox = e(BaseCheckbox, {
+			disabled = props.disabled,
+			pressed = press,
+			hovered = hover,
+			checked = props.value == true,
+		}),
+
+		container = e("Frame", {
+			AnchorPoint = Vector2.new(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, -28 - styles.spacing, 0, 30),
+			Position = UDim2.fromScale(1, 0),
+		}, {
+			layout = e(Layout.ListLayout, {
+				direction = Enum.FillDirection.Vertical,
+				alignY = Enum.VerticalAlignment.Center,
+				gap = styles.spacing / 2,
+			}),
+
+			label = e(Text, {
+				text = props.label,
+				textColor = if props.emphasised
+					then theme:GetColor(Enum.StudioStyleGuideColor.BrightText, modifier)
+					else theme:GetColor(Enum.StudioStyleGuideColor.MainText, modifier),
+				order = 10,
+			}),
+
+			hint = props.hint and e(Text, {
+				text = props.hint,
+				textColor = theme:GetColor(Enum.StudioStyleGuideColor.DimmedText, modifier),
+				order = 20,
+			}),
+		}),
+	})
+end
+
+return Hooks.new(Roact)(Checkbox)
+]]></string>
+        </Properties>
+        <Item class="ModuleScript" referent="15">
+          <Properties>
+            <string name="Name">BaseCheckbox</string>
+            <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local Hooks = require(Packages.Hooks)
+local StudioTheme = require(Packages.StudioTheme)
+
+local Layout = require(script.Parent.Parent.Layout)
+local Icon = require(script.Parent.Parent.Icon)
+
+local e = Roact.createElement
+
+export type BaseCheckboxProps = {
+	anchor: Vector2?,
+	disabled: boolean?,
+	pressed: boolean?,
+	hovered: boolean?,
+	checked: boolean?,
+	position: UDim2?,
+	order: number?,
+}
+
+local function BaseCheckbox(props: BaseCheckboxProps, hooks)
+	local theme, styles = StudioTheme.useTheme(hooks)
+
+	local modifier = if props.disabled
+		then Enum.StudioStyleGuideModifier.Disabled
+		elseif props.checked then Enum.StudioStyleGuideModifier.Selected
+		elseif props.pressed then Enum.StudioStyleGuideModifier.Pressed
+		elseif props.hovered then Enum.StudioStyleGuideModifier.Hover
+		else nil
+
+	return e("Frame", {
+		AnchorPoint = props.anchor,
+		BackgroundColor3 = theme:GetColor(Enum.StudioStyleGuideColor.CheckedFieldBorder, modifier),
+		Position = props.position,
+		LayoutOrder = props.order,
+		Size = UDim2.fromOffset(28, 28),
+	}, {
+		corners = e(Layout.Corner),
+		padding = e(Layout.Padding, { 1 }),
+
+		container = e("Frame", {
+			BackgroundColor3 = theme:GetColor(Enum.StudioStyleGuideColor.CheckedFieldBackground, modifier),
+			Size = UDim2.fromScale(1, 1),
+		}, {
+			corners = e(Layout.Corner, {
+				radius = styles.borderRadius - 1,
+			}),
+
+			indicator = props.checked and e(Icon, {
+				icon = "Tick",
+				anchor = Vector2.new(0.5, 0.5),
+				position = UDim2.fromScale(0.5, 0.5),
+				color = theme:GetColor(Enum.StudioStyleGuideColor.CheckedFieldIndicator, modifier),
+			}),
+		}),
+	})
+end
+
+return Hooks.new(Roact)(BaseCheckbox)
+]]></string>
+          </Properties>
+        </Item>
+      </Item>
+      <Item class="ModuleScript" referent="16">
+        <Properties>
+          <string name="Name">Dropdown</string>
+          <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local Hooks = require(Packages.Hooks)
+local Sift = require(Packages.Sift)
+
+local DropdownButton = require(script.Button)
+local PopoverShield = require(script.Shield)
+local OptionsContainer = require(script.OptionsContainer)
+local OptionButton = require(script.OptionButton)
+
+local e = Roact.createElement
+
+type DropdownOption = {
+	label: string?,
+	hint: string?,
+	disabled: boolean?,
+	value: any,
+	icon: string?,
+	iconPosition: string?,
+	iconColor: Color3?,
+}
+
+export type DropdownProps = {
+	disabled: boolean?,
+	label: string?,
+	hint: string?,
+	value: any?,
+	options: { DropdownOption }?,
+	onChanged: ((value: any) -> ())?,
+	icon: string?,
+	iconPosition: string?,
+	iconColor: Color3?,
+}
+
+local function Dropdown(props: DropdownProps, hooks)
+	local buttonPosition, setButtonPosition = hooks.useState(Vector2.new())
+	local buttonSize, setButtonSize = hooks.useState(Vector2.new())
+
+	local showDropdown, setShowDropdown = hooks.useState(false)
+
+	local optionButtons = hooks.useMemo(function()
+		table.sort(props.options, function(a, b)
+			local labelA = a.label or tostring(a.value)
+			local labelB = b.label or tostring(b.value)
+
+			return labelA < labelB
+		end)
+
+		return Sift.Array.map(props.options, function(option: DropdownOption, index: number)
+			return e(OptionButton, {
+				icon = option.icon,
+				iconColor = option.iconColor,
+				iconPosition = option.iconPosition,
+				label = option.label or tostring(option.value),
+				hint = option.hint,
+				disabled = option.disabled,
+				selected = props.value == option.value,
+				order = index,
+
+				onActivated = function()
+					setShowDropdown(false)
+					props.onChanged(option.value)
+				end,
+			})
+		end)
+	end, { props.options, props.onChanged, props.value })
+
+	return Roact.createFragment({
+		button = e(DropdownButton, {
+			disabled = props.disabled,
+			icon = props.icon,
+			iconPosition = props.iconPosition,
+			iconColor = props.iconColor,
+			label = props.label,
+			hint = props.hint,
+			active = showDropdown,
+
+			onActivated = function()
+				setShowDropdown(true)
+			end,
+
+			onPositionChanged = function(rbx: ImageButton)
+				setButtonPosition(rbx.AbsolutePosition)
+			end,
+
+			onSizeChanged = function(rbx: ImageButton)
+				setButtonSize(rbx.AbsoluteSize)
+			end,
+		}),
+
+		popover = if showDropdown
+			then e(PopoverShield, {
+				onActivated = function()
+					setShowDropdown(false)
+				end,
+			}, {
+				options = e(OptionsContainer, {
+					buttonSize = buttonSize,
+					buttonPosition = buttonPosition,
+				}, optionButtons),
+			})
+			else nil,
+	})
+end
+
+return Hooks.new(Roact)(Dropdown, {
+	defaultProps = {
+		options = {},
+	},
+})
+]]></string>
+        </Properties>
+        <Item class="ModuleScript" referent="17">
+          <Properties>
+            <string name="Name">Button</string>
+            <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local Hooks = require(Packages.Hooks)
+local StudioTheme = require(Packages.StudioTheme)
+
+local Layout = require(script.Parent.Parent.Layout)
+local Text = require(script.Parent.Parent.Text)
+local Icon = require(script.Parent.Parent.Icon)
+
+local e = Roact.createElement
+
+export type DropdownButtonProps = {
+	label: string?,
+	hint: string?,
+	disabled: boolean?,
+	active: boolean?,
+	order: number?,
+	icon: string?,
+	iconPosition: string?,
+	iconColor: Color3?,
+	onActivated: ((rbx: ImageButton) -> ())?,
+	onPositionChanged: ((rbx: ImageButton) -> ())?,
+	onSizeChanged: ((rbx: ImageButton) -> ())?,
+}
+
+local function DropdownButton(props: DropdownButtonProps, hooks)
+	local theme, styles = StudioTheme.useTheme(hooks)
+
+	local hover, setHover = hooks.useState(false)
+	local press, setPress = hooks.useState(false)
+
+	local colors = hooks.useMemo(function()
+		local colors = {
+			border = { Enum.StudioStyleGuideColor.InputFieldBorder, nil },
+			background = { Enum.StudioStyleGuideColor.InputFieldBackground, nil },
+			foreground = { Enum.StudioStyleGuideColor.MainText, nil },
+			hint = { Enum.StudioStyleGuideColor.DimmedText, nil },
+		}
+
+		if props.disabled then
+			colors.border[2] = Enum.StudioStyleGuideModifier.Disabled
+			colors.background[2] = Enum.StudioStyleGuideModifier.Disabled
+			colors.foreground[2] = Enum.StudioStyleGuideModifier.Disabled
+			colors.hint[2] = Enum.StudioStyleGuideModifier.Disabled
+		elseif press or props.active then
+			colors.border[2] = Enum.StudioStyleGuideModifier.Pressed
+			colors.background[2] = Enum.StudioStyleGuideModifier.Pressed
+			colors.foreground[2] = Enum.StudioStyleGuideModifier.Pressed
+			colors.hint[2] = Enum.StudioStyleGuideModifier.Pressed
+		elseif hover then
+			colors.border[2] = Enum.StudioStyleGuideModifier.Hover
+			colors.background[2] = Enum.StudioStyleGuideModifier.Hover
+			colors.foreground[2] = Enum.StudioStyleGuideModifier.Hover
+			colors.hint[2] = Enum.StudioStyleGuideModifier.Hover
+		end
+
+		colors.border = theme:GetColor(colors.border[1], colors.border[2])
+		colors.background = theme:GetColor(colors.background[1], colors.background[2])
+		colors.foreground = theme:GetColor(colors.foreground[1], colors.foreground[2])
+		colors.hint = theme:GetColor(colors.hint[1], colors.hint[2])
+
+		return colors
+	end, { theme, hover, press, props.disabled, props.active })
+
+	local onInputBegan = hooks.useCallback(function(_, input: InputObject)
+		if props.disabled then
+			return
+		end
+
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			setHover(true)
+		elseif input.UserInputType.Name:match("MouseButton%d+") then
+			setPress(true)
+		end
+	end, { props.disabled })
+
+	local function onInputEnded(_, input: InputObject)
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			setHover(false)
+			setPress(false)
+		elseif input.UserInputType.Name:match("MouseButton%d+") then
+			setPress(false)
+		end
+	end
+
+	return e("ImageButton", {
+		Active = not props.disabled,
+		AutoButtonColor = false,
+		BackgroundColor3 = colors.border,
+		LayoutOrder = props.order,
+		Selectable = not props.disabled,
+		Size = UDim2.fromScale(1, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+
+		[Roact.Event.Activated] = props.onActivated,
+		[Roact.Event.InputBegan] = onInputBegan,
+		[Roact.Event.InputEnded] = onInputEnded,
+
+		[Roact.Change.AbsoluteSize] = props.onSizeChanged,
+		[Roact.Change.AbsolutePosition] = props.onPositionChanged,
+	}, {
+		padding = e(Layout.Padding, { 1 }),
+		corners = e(Layout.Corner),
+
+		content = e("Frame", {
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundColor3 = colors.background,
+			BorderSizePixel = 0,
+			Size = UDim2.fromScale(1, 0),
+		}, {
+			padding = e(Layout.Padding),
+
+			corners = e(Layout.Corner, {
+				radius = styles.borderRadius - 1,
+			}),
+
+			layout = e(Layout.ListLayout, {
+				alignY = Enum.VerticalAlignment.Center,
+				alignX = Enum.HorizontalAlignment.Right,
+			}),
+
+			icon = e(Icon, {
+				icon = "Caret",
+				color = colors.foreground,
+				order = 20,
+				size = 16,
+			}),
+
+			text = e("Frame", {
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				ClipsDescendants = true,
+				LayoutOrder = 10,
+				Size = UDim2.new(1, -24, 0, 0),
+			}, {
+				layout = e(Layout.ListLayout, {
+					alignY = Enum.VerticalAlignment.Center,
+				}),
+
+				icon = props.icon and e(Icon, {
+					icon = props.icon,
+					order = if props.iconPosition == "end" then 40 else 10,
+					color = if props.iconColor then props.iconColor else colors.foreground,
+					size = 16,
+				}),
+
+				label = e(Text, {
+					text = props.label,
+					textColor = colors.foreground,
+					wrapped = false,
+					order = 20,
+				}),
+
+				hint = if props.hint
+					then e(Text, {
+						text = props.hint,
+						textColor = colors.hint,
+						wrapped = false,
+						order = 30,
+					})
+					else nil,
+			}),
+		}),
+	})
+end
+
+return Hooks.new(Roact)(DropdownButton)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="18">
+          <Properties>
+            <string name="Name">OptionButton</string>
+            <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local Hooks = require(Packages.Hooks)
+local StudioTheme = require(Packages.StudioTheme)
+
+local Layout = require(script.Parent.Parent.Layout)
+local Text = require(script.Parent.Parent.Text)
+local Icon = require(script.Parent.Parent.Icon)
+
+local e = Roact.createElement
+
+export type OptionButtonProps = {
+	label: string?,
+	hint: string?,
+	order: number?,
+	icon: string?,
+	iconPosition: string?,
+	iconColor: Color3?,
+	disabled: boolean?,
+	selected: boolean?,
+	onActivated: ((rbx: ImageButton) -> ())?,
+}
+
+local function OptionButton(props: OptionButtonProps, hooks)
+	local theme = StudioTheme.useTheme(hooks)
+
+	local hover, setHover = hooks.useState(false)
+
+	local colors = hooks.useMemo(function()
+		local colors = {
+			background = { Enum.StudioStyleGuideColor.TableItem, nil, 1 },
+			foreground = { Enum.StudioStyleGuideColor.MainText, nil },
+			hint = { Enum.StudioStyleGuideColor.DimmedText, nil },
+		}
+
+		if props.disabled then
+			colors.foreground[2] = Enum.StudioStyleGuideModifier.Disabled
+			colors.hint[2] = Enum.StudioStyleGuideModifier.Disabled
+		elseif props.selected then
+			colors.background[3] = 0
+			colors.background[2] = Enum.StudioStyleGuideModifier.Selected
+			colors.foreground[2] = Enum.StudioStyleGuideModifier.Selected
+			colors.hint[2] = Enum.StudioStyleGuideModifier.Selected
+		elseif hover then
+			colors.background[3] = 0
+			colors.background[2] = Enum.StudioStyleGuideModifier.Hover
+			colors.foreground[2] = Enum.StudioStyleGuideModifier.Hover
+			colors.hint[2] = Enum.StudioStyleGuideModifier.Hover
+		end
+
+		colors.backgroundTransparency = colors.background[3]
+		colors.background = theme:GetColor(colors.background[1], colors.background[2])
+		colors.foreground = theme:GetColor(colors.foreground[1], colors.foreground[2])
+		colors.hint = theme:GetColor(colors.hint[1], colors.hint[2])
+
+		return colors
+	end, { theme, hover, props.disabled, props.selected })
+
+	local onInputBegan = hooks.useCallback(function(_, input: InputObject)
+		if props.disabled then
+			return
+		end
+
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			setHover(true)
+		end
+	end, { props.disabled })
+
+	local function onInputEnded(_, input: InputObject)
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			setHover(false)
+		end
+	end
+
+	return e("ImageButton", {
+		AutoButtonColor = false,
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundColor3 = colors.background,
+		BackgroundTransparency = colors.backgroundTransparency,
+		Size = UDim2.fromScale(1, 0),
+
+		[Roact.Event.Activated] = props.onActivated,
+		[Roact.Event.InputBegan] = onInputBegan,
+		[Roact.Event.InputEnded] = onInputEnded,
+	}, {
+		padding = e(Layout.Padding),
+
+		corners = e(Layout.Corner, {
+			radius = 2,
+		}),
+
+		layout = e(Layout.ListLayout, {
+			alignY = Enum.VerticalAlignment.Center,
+		}),
+
+		icon = props.icon and e(Icon, {
+			icon = props.icon,
+			order = if props.iconPosition == "end" then 40 else 10,
+			color = if props.iconColor then props.iconColor else colors.foreground,
+			size = 16,
+		}),
+
+		label = e(Text, {
+			text = props.label,
+			textColor = colors.foreground,
+			wrapped = false,
+			order = 20,
+		}),
+
+		hint = if props.hint
+			then e(Text, {
+				text = props.hint,
+				textColor = colors.hint,
+				wrapped = false,
+				order = 30,
+			})
+			else nil,
+	})
+end
+
+return Hooks.new(Roact)(OptionButton)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="19">
+          <Properties>
+            <string name="Name">OptionsContainer</string>
+            <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local Hooks = require(Packages.Hooks)
+local StudioTheme = require(Packages.StudioTheme)
+local StudioPlugin = require(Packages.StudioPlugin)
+
+local Layout = require(script.Parent.Parent.Layout)
+
+local e = Roact.createElement
+
+export type OptionsContainerProps = {
+	buttonPosition: Vector2?,
+	buttonSize: Vector2?,
+}
+
+local function OptionsContainer(props: OptionsContainerProps, hooks)
+	local theme, styles = StudioTheme.useTheme(hooks)
+	local widget = StudioPlugin.useWidget(hooks)
+
+	local optionsSize, setOptionsSize = hooks.useState(Vector2.new())
+	local scrollable, setScrollable = hooks.useState(false)
+
+	local logicalContainerSize = hooks.useMemo(function()
+		return Vector2.new(props.buttonSize.X, math.min(optionsSize.Y, widget.AbsoluteSize.Y))
+	end, { optionsSize })
+
+	local containerDisplay = hooks.useMemo(function()
+		local targetPosition = props.buttonPosition + Vector2.new(0, props.buttonSize.Y + (styles.spacing / 2))
+		local targetSize = UDim2.fromOffset(logicalContainerSize.X, logicalContainerSize.Y + 2 + styles.spacing)
+		local targetAnchor = Vector2.new()
+
+		if (targetPosition + logicalContainerSize).Y >= widget.AbsoluteSize.Y then
+			targetPosition = props.buttonPosition - Vector2.new(0, styles.spacing / 2)
+			targetAnchor = Vector2.new(0, 1)
+
+			if targetPosition.Y - targetSize.Y.Offset < 0 then
+				targetSize = UDim2.new(1, -styles.spacing * 2, 1, -styles.spacing * 3)
+				targetPosition = Vector2.new(styles.spacing, styles.spacing * 2)
+				targetAnchor = Vector2.new()
+			end
+		end
+
+		return {
+			position = UDim2.fromOffset(targetPosition.X, targetPosition.Y),
+			anchor = targetAnchor,
+			size = targetSize,
+		}
+	end, { props.buttonPosition, props.buttonSize, styles, logicalContainerSize })
+
+	local function onScrollFrameAdjusted(rbx: ScrollingFrame)
+		setScrollable(rbx.AbsoluteCanvasSize.Y > rbx.AbsoluteWindowSize.Y)
+	end
+
+	return e("ImageButton", {
+		AnchorPoint = containerDisplay.anchor,
+		AutoButtonColor = false,
+		BackgroundColor3 = theme:GetColor(Enum.StudioStyleGuideColor.InputFieldBorder),
+		Position = containerDisplay.position,
+		Size = containerDisplay.size,
+		ClipsDescendants = true,
+	}, {
+		corners = e(Layout.Corner),
+		padding = e(Layout.Padding, { 1 }),
+
+		options = e("Frame", {
+			BackgroundColor3 = theme:GetColor(Enum.StudioStyleGuideColor.InputFieldBackground),
+			ClipsDescendants = true,
+			Size = UDim2.fromScale(1, 1),
+		}, {
+			padding = e(Layout.Padding, { styles.spacing * 0.5 }),
+
+			corners = e(Layout.Corner, {
+				radius = styles.borderRadius - 1,
+			}),
+
+			options = e("ScrollingFrame", {
+				AutomaticCanvasSize = Enum.AutomaticSize.Y,
+				BottomImage = "rbxasset://textures/StudioSharedUI/ScrollBarBottom.png",
+				CanvasSize = UDim2.new(),
+				ElasticBehavior = Enum.ElasticBehavior.Never,
+				MidImage = "rbxasset://textures/StudioSharedUI/ScrollBarMiddle.png",
+				ScrollBarImageColor3 = theme:GetColor(Enum.StudioStyleGuideColor.MainText),
+				ScrollBarThickness = 8,
+				ScrollingDirection = Enum.ScrollingDirection.Y,
+				TopImage = "rbxasset://textures/StudioSharedUI/ScrollBarTop.png",
+				VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
+				Active = true,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Size = UDim2.fromScale(1, 1),
+
+				[Roact.Change.AbsoluteCanvasSize] = onScrollFrameAdjusted,
+				[Roact.Change.AbsoluteWindowSize] = onScrollFrameAdjusted,
+			}, {
+				padding = e(Layout.Padding, { 0, if scrollable then styles.spacing else 0, 0, 0 }),
+
+				layout = e(Layout.ListLayout, {
+					direction = Enum.FillDirection.Vertical,
+					gap = 0,
+
+					onSizeChanged = function(rbx: UIListLayout)
+						setOptionsSize(rbx.AbsoluteContentSize)
+					end,
+				}),
+
+				options = Roact.createFragment(props[Roact.Children]),
+			}),
+		}),
+	})
+end
+
+return Hooks.new(Roact)(OptionsContainer)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="20">
+          <Properties>
+            <string name="Name">Shield</string>
+            <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local Hooks = require(Packages.Hooks)
+local StudioPlugin = require(Packages.StudioPlugin)
+
+local e = Roact.createElement
+
+export type DropdownPopoverShieldProps = {
+	onActivated: ((rbx: ImageButton) -> ())?,
+}
+
+local function DropdownPopoverShield(props: DropdownPopoverShieldProps, hooks)
+	local widget = StudioPlugin.useWidget(hooks)
+
+	return e(Roact.Portal, {
+		target = widget,
+	}, {
+		scrollShield = e("ScrollingFrame", {
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = 300,
+			BorderSizePixel = 0,
+			CanvasSize = UDim2.fromScale(1, 1),
+			ScrollBarThickness = 0,
+			ScrollingDirection = Enum.ScrollingDirection.Y,
+		}, {
+			clickShield = e("ImageButton", {
+				AutoButtonColor = false,
+				BackgroundTransparency = 1,
+				Size = UDim2.fromScale(1, 1),
+
+				[Roact.Event.Activated] = props.onActivated,
+			}, props[Roact.Children]),
+		}),
+	})
+end
+
+return Hooks.new(Roact)(DropdownPopoverShield)
+]]></string>
+          </Properties>
+        </Item>
+      </Item>
+      <Item class="ModuleScript" referent="21">
+        <Properties>
+          <string name="Name">FrameworkSelect</string>
+          <string name="Source"><![CDATA[local Plugin = script.Parent.Parent
+
+local RoduxHooks = require(Plugin.Packages.RoduxHooks)
+local Roact = require(Plugin.Packages.Roact)
+local Hooks = require(Plugin.Packages.Hooks)
+local Sift = require(Plugin.Packages.Sift)
+
+local Enums = require(Plugin.Data.Enums)
+local Actions = require(Plugin.Actions)
+
+local Dropdown = require(Plugin.Components.Dropdown)
+local Layout = require(Plugin.Components.Layout)
+
+local e = Roact.createElement
+
+export type FrameworkSelectProps = {
+	order: number?,
+}
+
+local FRAMEWORK_ENUM_MAP = {
+	[Enums.Framework.Regular] = {
+		icon = "FrameworkRegular",
+		label = "Regular",
+		hint = 'Instance.new("Frame")',
+	},
+	[Enums.Framework.Fusion] = {
+		icon = "FrameworkFusion",
+		label = "Fusion",
+		hint = 'New "Frame" { ... }',
+	},
+	[Enums.Framework.Roact] = {
+		icon = "FrameworkRoact",
+		label = "Roact",
+		hint = 'Roact.createElement("Frame", { ... }, { ... })',
+	},
+}
+
+local DROPDOWN_OPTIONS = Sift.Dictionary.values(Sift.Dictionary.map(FRAMEWORK_ENUM_MAP, function(details, enumItem)
+	return {
+		icon = details.icon,
+		label = details.label,
+		hint = details.hint,
+		value = enumItem,
+	}
+end))
+
+local function FrameworkSelect(props: FrameworkSelectProps, hooks)
+	local dispatch = RoduxHooks.useDispatch(hooks)
+
+	local userSettings = RoduxHooks.useSelector(hooks, function(state)
+		return state.userSettings
+	end)
+
+	local framework = userSettings.framework
+	local details = FRAMEWORK_ENUM_MAP[framework] or {}
+
+	return e(Layout.Forms.Section, {
+		heading = "Framework",
+		hint = "Select the framework to be used by the plugin when generating code snippets.",
+		order = props.order,
+	}, {
+		value = e(Dropdown, {
+			icon = details.icon,
+			label = details.label,
+			hint = details.hint,
+			value = framework,
+			options = DROPDOWN_OPTIONS,
+
+			onChanged = function(value)
+				dispatch(Actions.SetSetting({
+					key = "framework",
+					value = value,
+				}))
+			end,
+		}),
+	})
+end
+
+return Hooks.new(Roact)(FrameworkSelect)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="22">
+        <Properties>
+          <string name="Name">Icon</string>
+          <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Packages
+
+local IconMap = require(script.Parent.Parent.IconMap)
+
+local Roact = require(Packages.Roact)
+local Hooks = require(Packages.Hooks)
+local StudioTheme = require(Packages.StudioTheme)
+
+local e = Roact.createElement
+
+export type IconProps = {
+	icon: string,
+	anchor: Vector2?,
+	size: (UDim2 | number)?,
+	position: UDim2?,
+	rotation: number?,
+	color: Color3?,
+	zindex: number?,
+	order: number?,
+	resample: Enum.ResamplerMode?,
+	scaleType: Enum.ScaleType?,
+	imageOffset: Vector2?,
+	imageSize: Vector2?,
+	transparency: number?,
+}
+
+local function Icon(props: IconProps, hooks)
+	local theme, styles = StudioTheme.useTheme(hooks)
+
+	local icon = hooks.useMemo(function()
+		local icon = IconMap[props.icon]
+
+		if icon and icon[theme.Name] then
+			return icon[theme.Name]
+		end
+
+		return icon
+	end, { props.icon, theme })
+
+	local size = hooks.useMemo(function()
+		return if typeof(props.size) == "UDim2"
+			then props.size
+			elseif type(props.size) == "number" then UDim2.fromOffset(props.size, props.size)
+			else UDim2.fromOffset(styles.fontSize, styles.fontSize)
+	end, { props.size, icon, styles.fontSize })
+
+	return e("ImageLabel", {
+		AnchorPoint = props.anchor,
+		BackgroundTransparency = 1,
+		LayoutOrder = props.order,
+		Position = props.position,
+		Rotation = props.rotation,
+		Size = size,
+		ZIndex = props.zindex,
+		Image = if icon then icon.assetId else props.icon,
+		ImageColor3 = if icon and icon.color
+			then icon.color
+			elseif props.color then props.color
+			else theme:GetColor(Enum.StudioStyleGuideColor.MainText),
+		ImageRectOffset = if icon then Vector2.new(icon.x, icon.y) else props.imageOffset,
+		ImageRectSize = if icon then Vector2.new(icon.w, icon.h) else props.imageSize,
+		ImageTransparency = props.transparency,
+		ResampleMode = props.resample,
+		ScaleType = props.scaleType,
+	})
+end
+
+return Hooks.new(Roact)(Icon)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="23">
+        <Properties>
+          <string name="Name">JustifyFrame</string>
+          <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local Sift = require(Packages.Sift)
+local Hooks = require(Packages.Hooks)
+
+local e = Roact.createElement
+local max = math.max
+
+export type JustifyFrameProps = {
+	autoSize: (boolean | Enum.AutomaticSize)?,
+	size: UDim2?,
+	position: UDim2?,
+	order: number?,
+	gap: number?,
+	direction: Enum.FillDirection?,
+	zindex: number?,
+	alignY: Enum.VerticalAlignment?,
+	alignX: Enum.HorizontalAlignment?,
+}
+
+local function JustifyFrame(props: JustifyFrameProps, hooks)
+	local childCount = hooks.useMemo(function()
+		if not props[Roact.Children] then
+			return 1
+		end
+
+		return max(Sift.Dictionary.count(props[Roact.Children]), 1)
+	end, { props[Roact.Children] })
+
+	local childSize = hooks.useMemo(function()
+		local secondaryAxis = if props.autoSize == nil then 1 else 0
+
+		return if props.direction == Enum.FillDirection.Vertical
+			then UDim2.fromScale(secondaryAxis, 1 / childCount)
+			else UDim2.fromScale(1 / childCount, secondaryAxis)
+	end, { childCount, props.direction })
+
+	local children = hooks.useMemo(function()
+		if not props[Roact.Children] then
+			return {}
+		end
+
+		return Sift.Dictionary.map(props[Roact.Children], function(el)
+			local prop = el.props["$justify"]
+
+			if type(prop) ~= "string" then
+				prop = type(el.component) == "string" and "Size" or "size"
+			end
+
+			return e(
+				el.component,
+				Sift.Dictionary.merge(el.props, {
+					[prop] = childSize,
+				})
+			)
+		end)
+	end, { props[Roact.Children], childSize })
+
+	return e("Frame", {
+		AutomaticSize = if props.autoSize == true then Enum.AutomaticSize.XY else props.autoSize,
+		BackgroundTransparency = 1,
+		Size = props.size,
+		Position = props.position,
+		LayoutOrder = props.order,
+		ZIndex = props.zindex,
+	}, {
+		content = Roact.createFragment(children),
+
+		layout = e("UIListLayout", {
+			Padding = UDim.new(0, props.gap),
+			FillDirection = props.direction,
+			HorizontalAlignment = props.alignX,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			VerticalAlignment = props.alignY,
+		}),
+	})
+end
+
+return Hooks.new(Roact)(JustifyFrame, {
+	defaultProps = {
+		gap = 0,
+		alignX = Enum.HorizontalAlignment.Left,
+		alignY = Enum.VerticalAlignment.Top,
+	},
+})
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="24">
+        <Properties>
+          <string name="Name">Layout</string>
+          <string name="Source"><![CDATA[return {
+	-- Layout Constraints
+	Corner = require(script.Corner),
+	ListLayout = require(script.ListLayout),
+	Padding = require(script.Padding),
+
+	-- Layout Components
+	Divider = require(script.Divider),
+	Frame = require(script.Frame),
+	ScrollColumn = require(script.ScrollColumn),
+
+	-- Subcomponents
+	Forms = require(script.Forms),
+}
+]]></string>
+        </Properties>
+        <Item class="ModuleScript" referent="25">
+          <Properties>
+            <string name="Name">Corner</string>
+            <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local StudioTheme = require(Packages.StudioTheme)
+local Hooks = require(Packages.Hooks)
+
+local e = Roact.createElement
+
+export type CornerProps = ({ number? } | { radius: number? })
+
+local function Corner(props: CornerProps, hooks)
+	local _, styles = StudioTheme.useTheme(hooks)
+
+	local radius = props.radius or props[1] or styles.borderRadius
+
+	return e("UICorner", {
+		CornerRadius = UDim.new(0, radius),
+	})
+end
+
+return Hooks.new(Roact)(Corner)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="26">
+          <Properties>
+            <string name="Name">Divider</string>
+            <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local Hooks = require(Packages.Hooks)
+local StudioTheme = require(Packages.StudioTheme)
+
+local e = Roact.createElement
+
+export type DividerProps = {
+	height: number?,
+	color: Color3?,
+	anchor: Vector2?,
+	position: UDim2?,
+	order: number?,
+	zindex: number?,
+}
+
+local function Divider(props: DividerProps, hooks)
+	local theme = StudioTheme.useTheme(hooks)
+
+	return e("Frame", {
+		AnchorPoint = props.anchor,
+		BackgroundColor3 = if props.color then props.color else theme:GetColor(Enum.StudioStyleGuideColor.Border),
+		BorderSizePixel = 0,
+		LayoutOrder = props.order,
+		Position = props.position,
+		Size = UDim2.new(1, 0, 0, props.height or 1),
+		ZIndex = props.zindex,
+	})
+end
+
+return Hooks.new(Roact)(Divider, {
+	defaultProps = {
+		height = 1,
+	},
+})
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="27">
+          <Properties>
+            <string name="Name">Forms</string>
+            <string name="Source"><![CDATA[return {
+	Section = require(script.Section),
+}
+]]></string>
+          </Properties>
+          <Item class="ModuleScript" referent="28">
+            <Properties>
+              <string name="Name">Section</string>
+              <string name="Source"><![CDATA[local Plugin = script.Parent.Parent.Parent.Parent
+
+local Roact = require(Plugin.Packages.Roact)
+local Hooks = require(Plugin.Packages.Hooks)
+local StudioTheme = require(Plugin.Packages.StudioTheme)
+
+local ListLayout = require(Plugin.Components.Layout.ListLayout)
+local Divider = require(Plugin.Components.Layout.Divider)
+local Frame = require(Plugin.Components.Layout.Frame)
+local Text = require(Plugin.Components.Text)
+local Icon = require(Plugin.Components.Icon)
+
+local e = Roact.createElement
+
+export type FormSectionProps = {
+	order: number?,
+	divider: boolean?,
+	heading: string?,
+	hint: string?,
+	formItem: boolean?,
+	collapsed: boolean?,
+	collapsible: boolean?,
+	icon: string?,
+}
+
+local function FormSection(props: FormSectionProps, hooks)
+	local collapsed, setCollapsed = hooks.useState(props.collapsed)
+	local theme, styles = StudioTheme.useTheme(hooks)
+
+	local function onActivated()
+		setCollapsed(not collapsed)
+	end
+
+	return e(Frame, {
+		order = props.order,
+	}, {
+		layout = e(ListLayout, {
+			direction = Enum.FillDirection.Vertical,
+			gap = props.formItem and styles.spacing * 0.5,
+		}),
+
+		divider = props.divider and e(Divider, {
+			order = 0,
+		}),
+
+		heading = props.heading and e("ImageButton", {
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			LayoutOrder = 10,
+			Size = UDim2.fromScale(1, 0),
+
+			[Roact.Event.Activated] = props.collapsible and onActivated,
+		}, {
+			layout = e(ListLayout, {
+				direction = Enum.FillDirection.Horizontal,
+			}),
+
+			collapseIcon = props.collapsible and e("Frame", {
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundTransparency = 1,
+				LayoutOrder = 10,
+				Size = UDim2.new(),
+			}, {
+				image = e(Icon, {
+					icon = "Caret",
+					color = theme:GetColor(Enum.StudioStyleGuideColor.BrightText),
+					rotation = collapsed and -90 or 0,
+					order = 10,
+				}),
+			}),
+
+			icon = props.icon and e(Icon, {
+				icon = props.icon,
+				order = 15,
+			}),
+
+			label = e(Text, {
+				text = props.heading,
+				textColor = theme:GetColor(Enum.StudioStyleGuideColor.BrightText),
+				size = props.collapsible and UDim2.new(1, -16, 0, 0),
+				font = not props.formItem and styles.font.semibold,
+				order = 20,
+			}),
+		}),
+
+		collapsible = not collapsed and Roact.createFragment({
+			hint = props.hint and e(Text, {
+				text = props.hint,
+				textColor = theme:GetColor(Enum.StudioStyleGuideColor.DimmedText),
+				order = 20,
+			}),
+
+			content = props[Roact.Children] and e(Frame, {
+				order = 30,
+			}, {
+				layout = e(ListLayout, {
+					direction = Enum.FillDirection.Vertical,
+				}),
+
+				Roact.createFragment(props[Roact.Children]),
+			}),
+		}),
+	})
+end
+
+return Hooks.new(Roact)(FormSection)
+]]></string>
+            </Properties>
+          </Item>
+        </Item>
+        <Item class="ModuleScript" referent="29">
+          <Properties>
+            <string name="Name">Frame</string>
+            <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local Hooks = require(Packages.Hooks)
+
+local e = Roact.createElement
+
+export type FrameProps = {
+	autoSize: Enum.AutomaticSize?,
+	size: UDim2?,
+	order: number?,
+}
+
+local function Frame(props: FrameProps)
+	return e("Frame", {
+		AutomaticSize = props.autoSize,
+		BackgroundTransparency = 1,
+		Size = props.size,
+		LayoutOrder = props.order,
+	}, props[Roact.Children])
+end
+
+return Hooks.new(Roact)(Frame, {
+	defaultProps = {
+		autoSize = Enum.AutomaticSize.Y,
+		size = UDim2.fromScale(1, 0),
+	},
+})
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="30">
+          <Properties>
+            <string name="Name">ListLayout</string>
+            <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local StudioTheme = require(Packages.StudioTheme)
+local Hooks = require(Packages.Hooks)
+
+local e = Roact.createElement
+
+export type ListLayoutProps = {
+	gap: number?,
+	direction: Enum.FillDirection?,
+	alignX: Enum.HorizontalAlignment?,
+	alignY: Enum.VerticalAlignment?,
+	order: Enum.SortOrder?,
+	onSizeChanged: ((UIListLayout) -> ())?,
+}
+
+local function ListLayout(props: ListLayoutProps, hooks)
+	local _, styles = StudioTheme.useTheme(hooks)
+
+	return e("UIListLayout", {
+		Padding = UDim.new(0, props.gap or styles.spacing),
+		FillDirection = props.direction,
+		HorizontalAlignment = props.alignX,
+		SortOrder = props.order,
+		VerticalAlignment = props.alignY,
+
+		[Roact.Change.AbsoluteContentSize] = props.onSizeChanged,
+	})
+end
+
+return Hooks.new(Roact)(ListLayout, {
+	defaultProps = {
+		direction = Enum.FillDirection.Horizontal,
+		order = Enum.SortOrder.LayoutOrder,
+		alignX = Enum.HorizontalAlignment.Left,
+		alignY = Enum.VerticalAlignment.Top,
+	},
+})
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="31">
+          <Properties>
+            <string name="Name">Padding</string>
+            <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local StudioTheme = require(Packages.StudioTheme)
+local Hooks = require(Packages.Hooks)
+
+local e = Roact.createElement
+
+export type PaddingProps = {
+	[number]: number?,
+	top: number?,
+	right: number?,
+	bottom: number?,
+	left: number?,
+}
+
+local function Padding(props: PaddingProps, hooks)
+	local _, styles = StudioTheme.useTheme(hooks)
+
+	local top = props.top or props[1] or styles.spacing
+	local right = props.right or props[2] or top
+	local bottom = props.bottom or props[3] or top
+	local left = props.left or props[4] or right
+
+	return e("UIPadding", {
+		PaddingTop = UDim.new(0, top),
+		PaddingRight = UDim.new(0, right),
+		PaddingBottom = UDim.new(0, bottom),
+		PaddingLeft = UDim.new(0, left),
+	})
+end
+
+return Hooks.new(Roact)(Padding)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="32">
+          <Properties>
+            <string name="Name">ScrollColumn</string>
+            <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local Hooks = require(Packages.Hooks)
+local StudioTheme = require(Packages.StudioTheme)
+
+local ListLayout = require(script.Parent.ListLayout)
+local ScrollButton = require(script.ScrollButton)
+
+local e = Roact.createElement
+
+export type ScrollColumnProps = {
+	position: UDim2?,
+	size: UDim2?,
+	disabled: boolean?,
+	paddingTop: number?,
+	paddingBottom: number?,
+	scrollbarWidth: number?,
+	visible: boolean?,
+}
+
+local function ScrollColumn(props: ScrollColumnProps, hooks)
+	local theme, styles = StudioTheme.useTheme(hooks)
+
+	local scrollFrameRef = hooks.useValue(Roact.createRef())
+	local scrollPosition, setScrollPosition = hooks.useState(Vector2.new())
+	local contentSize, setContentSize = hooks.useState(Vector2.new())
+	local frameSize, setFrameSize = hooks.useState(Vector2.new())
+
+	local newCanvasSize = hooks.useMemo(function()
+		return contentSize + Vector2.new(0, props.paddingTop + props.paddingBottom)
+	end, { contentSize, props.paddingTop, props.paddingBottom })
+
+	local scrollbarVisible = hooks.useMemo(function()
+		return newCanvasSize.Y > frameSize.Y
+	end, { newCanvasSize, frameSize })
+
+	local handlePosition = hooks.useMemo(function()
+		local maxScroll = newCanvasSize - frameSize
+		return scrollPosition / maxScroll
+	end, { scrollPosition, newCanvasSize, frameSize, props.scrollbarWidth })
+
+	local handleSize = hooks.useMemo(function()
+		return frameSize / newCanvasSize
+	end, { props.scrollbarWidth, frameSize, newCanvasSize })
+
+	local incrementScroll = hooks.useCallback(function(amount: Vector2)
+		local scrollFrame: ScrollingFrame? = scrollFrameRef.value:getValue()
+
+		if scrollFrame then
+			scrollFrame.CanvasPosition += amount
+		end
+	end, { setScrollPosition, scrollPosition, scrollFrameRef.value })
+
+	return e("Frame", {
+		BackgroundTransparency = 1,
+		Position = props.position,
+		Size = props.size,
+		ClipsDescendants = true,
+		Visible = props.visible,
+	}, {
+		scrollbar = if scrollbarVisible
+			then Roact.createFragment({
+				upButton = e(ScrollButton, {
+					anchor = Vector2.new(1, 0),
+					position = UDim2.fromScale(1, 0),
+					size = UDim2.fromOffset(props.scrollbarWidth, props.scrollbarWidth),
+					zindex = 20,
+					icon = {
+						icon = "Caret",
+						rotation = 180,
+					},
+					onActivated = function()
+						incrementScroll(Vector2.new(0, -styles.fontSize))
+					end,
+				}),
+
+				downButton = e(ScrollButton, {
+					anchor = Vector2.new(1, 1),
+					position = UDim2.fromScale(1, 1),
+					size = UDim2.fromOffset(props.scrollbarWidth, props.scrollbarWidth),
+					zindex = 20,
+					icon = "Caret",
+					onActivated = function()
+						incrementScroll(Vector2.new(0, styles.fontSize))
+					end,
+				}),
+
+				scrollBacking = e("Frame", {
+					AnchorPoint = Vector2.new(1, 0),
+					BackgroundColor3 = theme:GetColor(Enum.StudioStyleGuideColor.ScrollBarBackground),
+					BorderColor3 = theme:GetColor(Enum.StudioStyleGuideColor.Border),
+					Position = UDim2.new(1, 0, 0, props.scrollbarWidth),
+					Size = UDim2.new(0, props.scrollbarWidth, 1, -props.scrollbarWidth * 2),
+					ZIndex = 10,
+				}, {
+					scrollHandle = e(ScrollButton, {
+						anchor = Vector2.new(1, handlePosition.Y),
+						position = UDim2.fromScale(1, handlePosition.Y),
+						size = UDim2.fromScale(1, handleSize.Y),
+					}),
+				}),
+			})
+			else nil,
+
+		column = e("ScrollingFrame", {
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = props.position,
+			Size = UDim2.fromScale(1, 1),
+			CanvasSize = UDim2.fromOffset(newCanvasSize.X, newCanvasSize.Y),
+			CanvasPosition = scrollPosition,
+			ElasticBehavior = Enum.ElasticBehavior.Never,
+			BottomImage = "",
+			MidImage = "",
+			TopImage = "",
+			ScrollBarImageColor3 = theme:GetColor(Enum.StudioStyleGuideColor.ScrollBar),
+			ScrollBarThickness = props.scrollbarWidth,
+			ScrollingEnabled = not props.disabled,
+			ScrollingDirection = Enum.ScrollingDirection.Y,
+			VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
+			ClipsDescendants = false,
+
+			[Roact.Ref] = scrollFrameRef.value,
+			[Roact.Change.AbsoluteSize] = function(rbx: ScrollingFrame)
+				setFrameSize(rbx.AbsoluteSize)
+			end,
+
+			[Roact.Change.CanvasPosition] = function(rbx: ScrollingFrame)
+				setScrollPosition(rbx.CanvasPosition)
+			end,
+		}, {
+			layout = e(ListLayout, {
+				direction = Enum.FillDirection.Vertical,
+				onSizeChanged = function(rbx: UIListLayout)
+					setContentSize(rbx.AbsoluteContentSize)
+				end,
+			}),
+
+			Roact.createFragment(props[Roact.Children]),
+		}),
+	})
+end
+
+return Hooks.new(Roact)(ScrollColumn, {
+	defaultProps = {
+		size = UDim2.fromScale(1, 1),
+		paddingTop = 0,
+		paddingBottom = 0,
+		scrollbarWidth = 18,
+	},
+})
+]]></string>
+          </Properties>
+          <Item class="ModuleScript" referent="33">
+            <Properties>
+              <string name="Name">ScrollButton</string>
+              <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local Hooks = require(Packages.Hooks)
+local StudioTheme = require(Packages.StudioTheme)
+local Sift = require(Packages.Sift)
+
+local Icon = require(script.Parent.Parent.Parent.Icon)
+
+local e = Roact.createElement
+
+export type ScrollButtonProps = {
+	anchor: Vector2?,
+	position: UDim2?,
+	size: UDim2?,
+	icon: (string | Icon.IconProps)?,
+	disabled: boolean?,
+	zindex: number?,
+	onActivated: ((ImageButton) -> ())?,
+}
+
+local function ScrollButton(props: ScrollButtonProps, hooks)
+	local theme = StudioTheme.useTheme(hooks)
+
+	local hover, setHover = hooks.useState(false)
+	local press, setPress = hooks.useState(false)
+
+	local colors = hooks.useMemo(function()
+		local colors = {
+			background = Enum.StudioStyleGuideColor.ScrollBar,
+			foreground = Enum.StudioStyleGuideColor.TitlebarText,
+			border = Enum.StudioStyleGuideColor.Border,
+		}
+
+		if props.disabled then
+			colors.background = theme:GetColor(colors.background :: any, Enum.StudioStyleGuideModifier.Disabled)
+			colors.foreground = theme:GetColor(colors.foreground :: any, Enum.StudioStyleGuideModifier.Disabled)
+			colors.border = theme:GetColor(colors.border :: any, Enum.StudioStyleGuideModifier.Disabled)
+		elseif press then
+			colors.background = theme:GetColor(colors.background :: any, Enum.StudioStyleGuideModifier.Pressed)
+			colors.foreground = theme:GetColor(colors.foreground :: any, Enum.StudioStyleGuideModifier.Pressed)
+			colors.border = theme:GetColor(colors.border :: any, Enum.StudioStyleGuideModifier.Pressed)
+		elseif hover then
+			colors.background = theme:GetColor(colors.background :: any, Enum.StudioStyleGuideModifier.Hover)
+			colors.foreground = theme:GetColor(colors.foreground :: any, Enum.StudioStyleGuideModifier.Hover)
+			colors.border = theme:GetColor(colors.border :: any, Enum.StudioStyleGuideModifier.Hover)
+		else
+			colors.background = theme:GetColor(colors.background :: any, Enum.StudioStyleGuideModifier.Default)
+			colors.foreground = theme:GetColor(colors.foreground :: any, Enum.StudioStyleGuideModifier.Default)
+			colors.border = theme:GetColor(colors.border :: any, Enum.StudioStyleGuideModifier.Default)
+		end
+
+		return colors
+	end, { props.disabled, press, hover, theme })
+
+	local onInputBegan = hooks.useCallback(function(_, input: InputObject)
+		if props.disabled then
+			return
+		end
+
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			setHover(true)
+		elseif input.UserInputType.Name:match("MouseButton%d+") then
+			setPress(true)
+		end
+	end, { props.disabled })
+
+	local function onInputEnded(_, input: InputObject)
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			setHover(false)
+			setPress(false)
+		elseif input.UserInputType.Name:match("MouseButton%d+") then
+			setPress(false)
+		end
+	end
+
+	local iconProps = hooks.useMemo(function()
+		return Sift.Dictionary.merge(
+			{
+				anchor = Vector2.new(0.5, 0.5),
+				position = UDim2.fromScale(0.5, 0.5),
+				color = colors.foreground,
+			},
+			if type(props.icon) == "table"
+				then props.icon
+				else {
+					icon = props.icon,
+				}
+		)
+	end, { props.icon, colors.foreground })
+
+	return e(if props.onActivated then "ImageButton" else "Frame", {
+		AutoButtonColor = if props.onActivated then false else nil,
+		AnchorPoint = props.anchor,
+		BackgroundColor3 = colors.background,
+		BorderColor3 = colors.border,
+		Position = props.position,
+		Size = props.size,
+		ZIndex = props.zindex,
+
+		[Roact.Event.InputBegan] = onInputBegan,
+		[Roact.Event.InputEnded] = onInputEnded,
+		[Roact.Event.Activated] = props.onActivated,
+	}, {
+		Icon = props.icon and e(Icon, iconProps),
+	})
+end
+
+return Hooks.new(Roact)(ScrollButton, {
+	defaultProps = {
+		zindex = 30,
+	},
+})
+]]></string>
+            </Properties>
+          </Item>
+        </Item>
+      </Item>
+      <Item class="ModuleScript" referent="34">
+        <Properties>
+          <string name="Name">Navigation</string>
+          <string name="Source"><![CDATA[return {
+	Container = require(script.Container),
+	Tab = require(script.Tab),
+}
+]]></string>
+        </Properties>
+        <Item class="ModuleScript" referent="35">
+          <Properties>
+            <string name="Name">Container</string>
+            <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local JustifyFrame = require(script.Parent.Parent.JustifyFrame)
+
+local e = Roact.createElement
+
+local function NavigationContainer(props)
+	return e("Frame", {
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 0, 36),
+		LayoutOrder = 0,
+	}, {
+		tabContainer = e(JustifyFrame, {
+			size = UDim2.fromScale(1, 1),
+			direction = Enum.FillDirection.Horizontal,
+			alignX = Enum.HorizontalAlignment.Center,
+			alignY = Enum.VerticalAlignment.Top,
+		}, props[Roact.Children]),
+	})
+end
+
+return NavigationContainer
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="36">
+          <Properties>
+            <string name="Name">Tab</string>
+            <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local Hooks = require(Packages.Hooks)
+local StudioTheme = require(Packages.StudioTheme)
+local RoactRouter = require(Packages.RoactRouter)
+
+local Layout = require(script.Parent.Parent.Layout)
+local Icon = require(script.Parent.Parent.Icon)
+local Text = require(script.Parent.Parent.Text)
+
+local e = Roact.createElement
+
+export type NavigationTabProps = {
+	label: string?,
+	icon: string?,
+	order: number?,
+	size: UDim2?,
+	location: string,
+}
+
+local function NavigationTab(props: NavigationTabProps, hooks)
+	local theme = StudioTheme.useTheme(hooks)
+	local history = RoactRouter.useHistory(hooks)
+
+	local hover, setHover = hooks.useState(false)
+	local press, setPress = hooks.useState(false)
+
+	local active = history.location.path == props.location
+
+	local modifier = if press
+		then Enum.StudioStyleGuideModifier.Pressed
+		elseif hover then Enum.StudioStyleGuideModifier.Hover
+		else nil
+
+	local onActivated = hooks.useCallback(function()
+		history:push(props.location)
+	end, { history, props.location })
+
+	return e("ImageButton", {
+		AutoButtonColor = false,
+		BackgroundColor3 = theme:GetColor(Enum.StudioStyleGuideColor.RibbonTab, modifier),
+		BorderSizePixel = 0,
+		LayoutOrder = props.order,
+		Size = props.size,
+		[Roact.Event.Activated] = onActivated,
+
+		[Roact.Event.InputBegan] = function(_, input: InputObject)
+			if input.UserInputType == Enum.UserInputType.MouseMovement then
+				setHover(true)
+			elseif input.UserInputType.Name:match("MouseButton%d+") then
+				setPress(true)
+			end
+		end,
+
+		[Roact.Event.InputEnded] = function(_, input: InputObject)
+			if input.UserInputType == Enum.UserInputType.MouseMovement then
+				setHover(false)
+				setPress(false)
+			elseif input.UserInputType.Name:match("MouseButton%d+") then
+				setPress(false)
+			end
+		end,
+	}, {
+		topBorder = if active
+			then e("Frame", {
+				BackgroundColor3 = theme:GetColor(Enum.StudioStyleGuideColor.LinkText, modifier),
+				BorderSizePixel = 0,
+				Size = UDim2.new(1, 0, 0, 2),
+			})
+			else nil,
+
+		leftBorder = if active
+			then e("Frame", {
+				AnchorPoint = Vector2.new(0, 1),
+				BackgroundColor3 = theme:GetColor(Enum.StudioStyleGuideColor.Border, modifier),
+				BorderSizePixel = 0,
+				Position = UDim2.fromScale(0, 1),
+				Size = UDim2.new(0, 2, 1, -2),
+			})
+			else nil,
+
+		rightBorder = if active
+			then e("Frame", {
+				AnchorPoint = Vector2.new(1, 1),
+				BackgroundColor3 = theme:GetColor(Enum.StudioStyleGuideColor.Border, modifier),
+				BorderSizePixel = 0,
+				Position = UDim2.fromScale(1, 1),
+				Size = UDim2.new(0, 2, 1, -2),
+			})
+			else nil,
+
+		bottomBorder = if not active
+			then e("Frame", {
+				AnchorPoint = Vector2.new(0, 1),
+				BackgroundColor3 = theme:GetColor(Enum.StudioStyleGuideColor.Border, modifier),
+				BorderSizePixel = 0,
+				Position = UDim2.fromScale(0, 1),
+				Size = UDim2.new(1, 0, 0, 2),
+			})
+			else nil,
+
+		content = e("Frame", {
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+			ClipsDescendants = true,
+		}, {
+			padding = e(Layout.Padding),
+
+			layout = e(Layout.ListLayout, {
+				direction = Enum.FillDirection.Horizontal,
+				alignX = Enum.HorizontalAlignment.Center,
+				alignY = Enum.VerticalAlignment.Center,
+			}),
+
+			icon = if props.icon
+				then e(Icon, {
+					icon = props.icon,
+					size = 16,
+					color = theme:GetColor(Enum.StudioStyleGuideColor.MainText, modifier),
+					order = 10,
+				})
+				else nil,
+
+			label = if props.label
+				then e(Text, {
+					text = props.label,
+					textColor = theme:GetColor(Enum.StudioStyleGuideColor.MainText, modifier),
+					order = 20,
+				})
+				else nil,
+		}),
+	})
+end
+
+return Hooks.new(Roact)(NavigationTab)
+]]></string>
+          </Properties>
+        </Item>
+      </Item>
+      <Item class="ModuleScript" referent="37">
+        <Properties>
+          <string name="Name">Pages</string>
+          <string name="Source"><![CDATA[return {
+	Home = require(script.Home),
+	Settings = require(script.Settings),
+}
+]]></string>
+        </Properties>
+        <Item class="ModuleScript" referent="38">
+          <Properties>
+            <string name="Name">Home</string>
+            <string name="Source"><![CDATA[local StudioService = game:GetService("StudioService")
+
+local Plugin = script.Parent.Parent.Parent
+
+local StudioPlugin = require(Plugin.Packages.StudioPlugin)
+local StudioTheme = require(Plugin.Packages.StudioTheme)
+local RoduxHooks = require(Plugin.Packages.RoduxHooks)
+local Roact = require(Plugin.Packages.Roact)
+local Hooks = require(Plugin.Packages.Hooks)
+
+local Frameworks = require(Plugin.Lib.Codify.Frameworks)
+local Thunks = require(Plugin.Thunks)
+
+local FrameworkSelect = require(Plugin.Components.FrameworkSelect)
+local TextInput = require(Plugin.Components.TextInput)
+local Button = require(Plugin.Components.Button)
+local Layout = require(Plugin.Components.Layout)
+local Alert = require(Plugin.Components.Alert)
+local Text = require(Plugin.Components.Text)
+local Icon = require(Plugin.Components.Icon)
+
+local e = Roact.createElement
+
+local IS_WINDOWS = game:GetService("GuiService").IsWindows
+local COPY_TEXT = if IS_WINDOWS then "CTRL+C to Copy" else "Command+C to Copy"
+local MAX_TEXTBOX_CHARS = 16300
+
+local function Page(_, hooks)
+	local theme, styles = StudioTheme.useTheme(hooks)
+	local showCopy, setShowCopy = hooks.useState(false)
+
+	local dispatch = RoduxHooks.useDispatch(hooks)
+	local plugin = StudioPlugin.usePlugin(hooks)
+
+	local targetInstance = RoduxHooks.useSelector(hooks, function(state)
+		return state.targetInstance
+	end)
+
+	local userSettings = RoduxHooks.useSelector(hooks, function(state)
+		return state.userSettings
+	end)
+
+	local snippet = RoduxHooks.useSelector(hooks, function(state)
+		return state.snippet
+	end)
+
+	local activeSelection = hooks.useMemo(function()
+		local name = "Nothing selected"
+		local icon = StudioService:GetClassIcon("Instance")
+
+		if targetInstance.instance then
+			name = targetInstance.instance.Name
+			icon = StudioService:GetClassIcon(targetInstance.instance.ClassName)
+		end
+
+		return {
+			name = name,
+			icon = icon,
+		}
+	end, { targetInstance })
+
+	return e(Layout.ScrollColumn, {
+		paddingTop = styles.spacing,
+		paddingBottom = styles.spacing,
+	}, {
+		padding = e(Layout.Padding),
+
+		framework = e(FrameworkSelect, {
+			order = 10,
+		}),
+
+		settingsHint = e(Text, {
+			text = "Output formatting can be configured in the Settings tab.",
+			textColor = theme:GetColor(Enum.StudioStyleGuideColor.DimmedText),
+			order = 15,
+		}),
+
+		instanceOmitHint = e(Text, {
+			text = "Instance-based properties (e.g. Adornee, PrimaryPart) will not be included in the output.",
+			textColor = theme:GetColor(Enum.StudioStyleGuideColor.DimmedText),
+			order = 16,
+		}),
+
+		activeSelection = e(Layout.Frame, {
+			order = 20,
+		}, {
+			padding = e(Layout.Padding, { 0, 16, 0, 0 }),
+			layout = e(Layout.ListLayout),
+
+			icon = e(Icon, {
+				icon = activeSelection.icon.Image,
+				imageOffset = activeSelection.icon.ImageRectOffset,
+				imageSize = activeSelection.icon.ImageRectSize,
+				color = Color3.new(1, 1, 1),
+				size = 16,
+				order = 10,
+			}),
+
+			label = e(Text, {
+				text = activeSelection.name,
+				font = styles.font.mono,
+				textSize = styles.fontSize + 2,
+				order = 20,
+			}),
+		}),
+
+		largeInstance = targetInstance.large and e(Alert, {
+			label = snippet.processing and "This may take a while! Studio may lag or become unresponsive."
+				or "This Instance appears to have a lot of children! Can it be broken into smaller components?",
+			variant = Enum.MessageType.MessageWarning,
+			icon = "Warning",
+			order = 30,
+		}),
+
+		generateError = snippet.error and e(Alert, {
+			label = string.match(snippet.error, "Request timed out") and "Request timed out. Please try again."
+				or "An error occurred while generating the snippet. Please try again.",
+			icon = if string.match(snippet.error, "Request timed out") then "CloudWarning" else "Warning",
+			variant = Enum.MessageType.MessageError,
+			order = 40,
+		}),
+
+		generateButton = e(Button, {
+			order = 40,
+			label = snippet.processing and "Working on it..." or "Generate Snippet",
+			primary = not targetInstance.large,
+			size = UDim2.fromScale(1, 0),
+			autoSize = Enum.AutomaticSize.Y,
+			disabled = targetInstance.instance == nil or snippet.processing,
+
+			onActivated = function()
+				dispatch(Thunks.GenerateSnippet())
+			end,
+		}),
+
+		snippet = e(Layout.Frame, {
+			order = 50,
+		}, {
+			layout = e(Layout.ListLayout, {
+				direction = Enum.FillDirection.Vertical,
+				alignX = Enum.HorizontalAlignment.Right,
+			}),
+
+			snippetText = e(TextInput, {
+				order = 20,
+				placeholder = (Frameworks[userSettings.framework] or {}).Sample,
+				text = snippet.content,
+				font = styles.font.mono,
+				textSize = styles.fontSize + 2,
+				readonly = true,
+				disabled = snippet.content == nil,
+				wrapped = false,
+				selectAllOnFocus = true,
+				syntaxHighlight = userSettings.syntaxHighlighting,
+				caption = snippet.content
+					and #snippet.content >= MAX_TEXTBOX_CHARS
+					and 'Snippet may be truncated. Use the "Save to Device" feature to view full snippet.',
+
+				onFocus = function()
+					setShowCopy(true)
+				end,
+
+				onFocusLost = function()
+					setShowCopy(false)
+				end,
+			}),
+		}),
+
+		snippetActions = e(Layout.Frame, {
+			order = 60,
+		}, {
+			layout = e(Layout.ListLayout, {
+				direction = Enum.FillDirection.Vertical,
+				alignX = Enum.HorizontalAlignment.Right,
+			}),
+
+			copyText = showCopy and e(Text, {
+				text = COPY_TEXT,
+				textColor = theme:GetColor(Enum.StudioStyleGuideColor.DimmedText),
+				textSize = styles.fontSize - 1,
+				font = styles.font.semibold,
+				order = 10,
+			}),
+
+			downloadButton = e(Button, {
+				primary = true,
+				disabled = snippet.content == nil,
+				order = 20,
+				label = "Save to Device",
+				icon = "Download",
+
+				onActivated = function()
+					dispatch(Thunks.ExportSnippetToDevice(plugin))
+				end,
+			}),
+		}),
+	})
+end
+
+return Hooks.new(Roact)(Page)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="39">
+          <Properties>
+            <string name="Name">Settings</string>
+            <string name="Source"><![CDATA[local Plugin = script.Parent.Parent.Parent
+
+local StudioTheme = require(Plugin.Packages.StudioTheme)
+local Roact = require(Plugin.Packages.Roact)
+local Hooks = require(Plugin.Packages.Hooks)
+
+local FrameworkSelect = require(Plugin.Components.FrameworkSelect)
+local Layout = require(Plugin.Components.Layout)
+
+local SyntaxHighlighting = require(script.SyntaxHighlighting)
+local IndentFormat = require(script.IndentFormat)
+local CreateMethod = require(script.CreateMethod)
+local ChildrenKey = require(script.ChildrenKey)
+local Inputs = require(script.Inputs)
+local About = require(script.About)
+local ParallelLuauToggle = require(script.ParallelLuauToggle)
+
+local e = Roact.createElement
+
+local function Page(_, hooks)
+	local _, styles = StudioTheme.useTheme(hooks)
+
+	return e(Layout.ScrollColumn, {
+		paddingTop = styles.spacing,
+		paddingBottom = styles.spacing,
+	}, {
+		padding = e(Layout.Padding),
+
+		framework = e(FrameworkSelect, {
+			order = 10,
+		}),
+
+		snippets = e(Layout.Forms.Section, {
+			heading = "Snippets",
+			hint = "Configure options relating to code snippets.",
+			collapsible = true,
+			divider = true,
+			order = 20,
+		}, {
+			syntaxHighlighting = e(SyntaxHighlighting, {
+				order = 10,
+			}),
+
+			indentFormat = e(IndentFormat, {
+				order = 20,
+			}),
+		}),
+
+		frameworks = e(Layout.Forms.Section, {
+			heading = "Generation",
+			hint = "Configure various options relating to the generation of code snippets.",
+			collapsible = true,
+			divider = true,
+			order = 40,
+		}, {
+			createMethod = e(CreateMethod, {
+				order = 10,
+			}),
+
+			childrenKey = e(ChildrenKey, {
+				order = 20,
+			}),
+
+			namingScheme = e(Inputs.NamingScheme, {
+				order = 30,
+			}),
+		}),
+
+		datatypes = e(Layout.Forms.Section, {
+			heading = "Data Types",
+			hint = "Configure how Roblox data types are formatted in your code snippets. You will need to regenerate your snippets to reflect changes.",
+			collapsible = true,
+			divider = true,
+			order = 50,
+		}, {
+			color3Format = e(Inputs.Color3Format, {
+				order = 20,
+			}),
+
+			enumFormat = e(Inputs.EnumFormat, {
+				order = 30,
+			}),
+
+			fontFormat = e(Inputs.FontFormat, {
+				order = 35,
+			}),
+
+			numberRangeFormat = e(Inputs.NumberRangeFormat, {
+				order = 40,
+			}),
+
+			udim2Format = e(Inputs.UDim2Format, {
+				order = 50,
+			}),
+
+			brickColorFormat = e(Inputs.BrickColorFormat, {
+				order = 60,
+			}),
+
+			physicalPropertiesFormat = e(Inputs.PhysicalPropertiesFormat, {
+				order = 70,
+			}),
+		}),
+
+		experimental = e(Layout.Forms.Section, {
+			heading = "Experimental",
+			hint = "These features may be highly unstable and may cause issues. Use at your own risk.",
+			collapsible = true,
+			collapsed = true,
+			divider = true,
+			order = 60,
+			icon = "Fire",
+		}, {
+			parallelLuau = e(ParallelLuauToggle, {
+				order = 10,
+			}),
+		}),
+
+		about = e(About, {
+			order = 70,
+		}),
+	})
+end
+
+return Hooks.new(Roact)(Page)
+]]></string>
+          </Properties>
+          <Item class="ModuleScript" referent="40">
+            <Properties>
+              <string name="Name">About</string>
+              <string name="Source"><![CDATA[local Plugin = script.Parent.Parent.Parent.Parent
+
+local RoduxHooks = require(Plugin.Packages.RoduxHooks)
+local Roact = require(Plugin.Packages.Roact)
+local Hooks = require(Plugin.Packages.Hooks)
+
+local Config = require(Plugin.Data.Config)
+local Thunks = require(Plugin.Thunks)
+
+local Layout = require(Plugin.Components.Layout)
+
+local e = Roact.createElement
+
+export type AboutProps = {
+	order: number?,
+}
+
+local function About(props: AboutProps, hooks)
+	local dispatch = RoduxHooks.useDispatch(hooks)
+
+	local attribution = RoduxHooks.useSelector(hooks, function(state)
+		return state.attribution
+	end)
+
+	hooks.useEffect(function()
+		dispatch(Thunks.FetchAuthors())
+		dispatch(Thunks.FetchContributors(Config.repo))
+	end, {})
+
+	return e(Layout.Forms.Section, {
+		heading = "About",
+		divider = true,
+		order = props.order,
+	}, {
+		version = e(Layout.Forms.Section, {
+			heading = "Version",
+			hint = Config.version,
+			formItem = true,
+			order = 10,
+		}),
+
+		author = #attribution.authors > 0 and e(Layout.Forms.Section, {
+			heading = "Authors",
+			hint = table.concat(attribution.authors, ", "),
+			formItem = true,
+			order = 20,
+		}),
+
+		contributors = #attribution.contributors > 0 and e(Layout.Forms.Section, {
+			heading = "Contributors",
+			hint = table.concat(attribution.contributors, ", "),
+			formItem = true,
+			order = 30,
+		}),
+	})
+end
+
+return Hooks.new(Roact)(About)
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="41">
+            <Properties>
+              <string name="Name">ChildrenKey</string>
+              <string name="Source"><![CDATA[local Plugin = script.Parent.Parent.Parent.Parent
+
+local StudioTheme = require(Plugin.Packages.StudioTheme)
+local RoduxHooks = require(Plugin.Packages.RoduxHooks)
+local Roact = require(Plugin.Packages.Roact)
+local Hooks = require(Plugin.Packages.Hooks)
+
+local Enums = require(Plugin.Data.Enums)
+local Actions = require(Plugin.Actions)
+
+local TextInput = require(Plugin.Components.TextInput)
+local Layout = require(Plugin.Components.Layout)
+
+local e = Roact.createElement
+
+export type ChildrenKeyProps = {
+	order: number?,
+}
+
+local DISABLED_FRAMEWORKS = {
+	Enums.Framework.Roact,
+	Enums.Framework.Regular,
+}
+
+local DEFAULT_METHODS = {
+	[Enums.Framework.Fusion] = "Children",
+}
+
+local function ChildrenKey(props: ChildrenKeyProps, hooks)
+	local _, styles = StudioTheme.useTheme(hooks)
+	local dispatch = RoduxHooks.useDispatch(hooks)
+
+	local userSettings = RoduxHooks.useSelector(hooks, function(state)
+		return state.userSettings
+	end)
+
+	local framework = userSettings.framework
+	local value = userSettings["childrenKey" .. framework]
+
+	if table.find(DISABLED_FRAMEWORKS, framework) then
+		return nil
+	end
+
+	return e(Layout.Forms.Section, {
+		heading = "Children Key",
+		hint = "If you've assigned the Children key to a variable, you can specify this here.",
+		formItem = true,
+		order = props.order,
+	}, {
+		value = e(TextInput, {
+			placeholder = DEFAULT_METHODS[framework],
+			text = value,
+			font = styles.font.mono,
+			textSize = styles.fontSize + 2,
+
+			onChanged = function(rbx: TextBox)
+				dispatch(Actions.SetSetting({
+					key = "childrenKey" .. framework,
+					value = rbx.Text,
+				}))
+			end,
+		}),
+	})
+end
+
+return Hooks.new(Roact)(ChildrenKey)
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="42">
+            <Properties>
+              <string name="Name">CreateMethod</string>
+              <string name="Source"><![CDATA[local Plugin = script.Parent.Parent.Parent.Parent
+
+local StudioTheme = require(Plugin.Packages.StudioTheme)
+local RoduxHooks = require(Plugin.Packages.RoduxHooks)
+local Roact = require(Plugin.Packages.Roact)
+local Hooks = require(Plugin.Packages.Hooks)
+
+local Enums = require(Plugin.Data.Enums)
+local Actions = require(Plugin.Actions)
+
+local TextInput = require(Plugin.Components.TextInput)
+local Layout = require(Plugin.Components.Layout)
+
+local e = Roact.createElement
+
+export type CreateMethodProps = {
+	order: number?,
+}
+
+local DISABLED_FRAMEWORKS = {
+	Enums.Framework.Regular,
+}
+
+local DEFAULT_METHODS = {
+	[Enums.Framework.Roact] = "Roact.createElement",
+	[Enums.Framework.Fusion] = "New",
+}
+
+local function CreateMethod(props: CreateMethodProps, hooks)
+	local _, styles = StudioTheme.useTheme(hooks)
+	local dispatch = RoduxHooks.useDispatch(hooks)
+
+	local userSettings = RoduxHooks.useSelector(hooks, function(state)
+		return state.userSettings
+	end)
+
+	local framework = userSettings.framework
+	local value = userSettings["createMethod" .. framework]
+
+	if table.find(DISABLED_FRAMEWORKS, framework) then
+		return nil
+	end
+
+	return e(Layout.Forms.Section, {
+		heading = "Create Method",
+		hint = "If you've assigned the creator method to a variable, you can specify this here.",
+		formItem = true,
+		order = props.order,
+	}, {
+		value = e(TextInput, {
+			placeholder = DEFAULT_METHODS[framework],
+			text = value,
+			font = styles.font.mono,
+			textSize = styles.fontSize + 2,
+
+			onChanged = function(rbx: TextBox)
+				dispatch(Actions.SetSetting({
+					key = "createMethod" .. framework,
+					value = rbx.Text,
+				}))
+			end,
+		}),
+	})
+end
+
+return Hooks.new(Roact)(CreateMethod)
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="43">
+            <Properties>
+              <string name="Name">IndentFormat</string>
+              <string name="Source"><![CDATA[local Plugin = script.Parent.Parent.Parent.Parent
+
+local StudioTheme = require(Plugin.Packages.StudioTheme)
+local RoduxHooks = require(Plugin.Packages.RoduxHooks)
+local Roact = require(Plugin.Packages.Roact)
+local Hooks = require(Plugin.Packages.Hooks)
+
+local Enums = require(Plugin.Data.Enums)
+local Actions = require(Plugin.Actions)
+
+local TextInput = require(Plugin.Components.TextInput)
+local Checkbox = require(Plugin.Components.Checkbox)
+local Layout = require(Plugin.Components.Layout)
+
+local e = Roact.createElement
+
+export type IndentFormatProps = {
+	order: number?,
+}
+
+local DISABLED_FRAMEWORKS = {
+	Enums.Framework.Regular,
+}
+
+local function IndentFormat(props: IndentFormatProps, hooks)
+	local styles = select(2, StudioTheme.useTheme(hooks))
+	local dispatch = RoduxHooks.useDispatch(hooks)
+
+	local userSettings = RoduxHooks.useSelector(hooks, function(state)
+		return state.userSettings
+	end)
+
+	local values = {
+		useTabs = userSettings.indentationUsesTabs,
+		tabWidth = userSettings.indentationLength,
+	}
+
+	if table.find(DISABLED_FRAMEWORKS, userSettings.framework) then
+		return nil
+	end
+
+	return e(Layout.Forms.Section, {
+		heading = "Indentation",
+		hint = "Select the indentation format for your code snippets.",
+		formItem = true,
+		order = props.order,
+	}, {
+		value = e(Checkbox, {
+			label = "Indent using tabs",
+			order = 10,
+			value = values.useTabs,
+
+			onChanged = function(value)
+				dispatch(Actions.SetSetting({
+					key = "indentationUsesTabs",
+					value = value,
+				}))
+			end,
+		}),
+
+		tabWidth = not values.useTabs and e(Layout.Forms.Section, {
+			heading = "Tab Width",
+			hint = "The number of spaces to use for each tab.",
+			formItem = true,
+			order = 20,
+		}, {
+			value = e(TextInput, {
+				placeholder = "2",
+				text = values.tabWidth,
+				font = styles.font.mono,
+				textSize = styles.fontSize + 2,
+
+				onChanged = function(rbx: TextBox)
+					dispatch(Actions.SetSetting({
+						key = "indentationLength",
+						value = tonumber(rbx.Text),
+					}))
+				end,
+			}),
+		}),
+	})
+end
+
+return Hooks.new(Roact)(IndentFormat)
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="44">
+            <Properties>
+              <string name="Name">Inputs</string>
+              <string name="Source"><![CDATA[return {
+	BrickColorFormat = require(script.BrickColorFormat),
+	Color3Format = require(script.Color3Format),
+	EnumFormat = require(script.EnumFormat),
+	FontFormat = require(script.FontFormat),
+	NamingScheme = require(script.NamingScheme),
+	NumberRangeFormat = require(script.NumberRangeFormat),
+	PhysicalPropertiesFormat = require(script.PhysicalPropertiesFormat),
+	UDim2Format = require(script.UDim2Format),
+}
+]]></string>
+            </Properties>
+            <Item class="ModuleScript" referent="45">
+              <Properties>
+                <string name="Name">BrickColorFormat</string>
+                <string name="Source"><![CDATA[local Plugin = script.Parent.Parent.Parent.Parent.Parent
+
+local Enums = require(Plugin.Data.Enums)
+local CreateInput = require(script.Parent.CreateInput)
+
+return CreateInput({
+	heading = "BrickColor Format",
+	hint = "Configure how BrickColor values are displayed in code snippets.",
+
+	settingsKey = "brickColorFormat",
+
+	enumMap = {
+		[Enums.BrickColorFormat.Name] = {
+			label = "Name",
+			hint = 'BrickColor.new("Bright red")',
+		},
+
+		[Enums.BrickColorFormat.Number] = {
+			label = "Number",
+			hint = "BrickColor.new(21)",
+		},
+
+		[Enums.BrickColorFormat.RGB] = {
+			label = "RGB",
+			hint = "BrickColor.new(196, 40, 28)",
+		},
+
+		[Enums.BrickColorFormat.Smart] = {
+			label = "Smart",
+			hint = "BrickColor.Red()",
+		},
+	},
+})
+]]></string>
+              </Properties>
+            </Item>
+            <Item class="ModuleScript" referent="46">
+              <Properties>
+                <string name="Name">Color3Format</string>
+                <string name="Source"><![CDATA[local Plugin = script.Parent.Parent.Parent.Parent.Parent
+
+local Enums = require(Plugin.Data.Enums)
+local CreateInput = require(script.Parent.CreateInput)
+
+return CreateInput({
+	heading = "Color3 Format",
+	hint = "Configure how Color3 values are displayed in code snippets.",
+
+	settingsKey = "color3Format",
+
+	enumMap = {
+		[Enums.Color3Format.Full] = {
+			label = "Full",
+			hint = "Color3.new",
+		},
+
+		[Enums.Color3Format.RGB] = {
+			label = "RGB",
+			hint = "Color3.fromRGB",
+		},
+
+		[Enums.Color3Format.HSV] = {
+			label = "HSV",
+			hint = "Color3.fromHSV",
+		},
+
+		[Enums.Color3Format.Hex] = {
+			label = "Hex",
+			hint = "Color3.fromHex",
+		},
+	},
+})
+]]></string>
+              </Properties>
+            </Item>
+            <Item class="ModuleScript" referent="47">
+              <Properties>
+                <string name="Name">CreateInput</string>
+                <string name="Source"><![CDATA[local Plugin = script.Parent.Parent.Parent.Parent.Parent
+
+local RoduxHooks = require(Plugin.Packages.RoduxHooks)
+local Roact = require(Plugin.Packages.Roact)
+local Hooks = require(Plugin.Packages.Hooks)
+local Sift = require(Plugin.Packages.Sift)
+
+local Actions = require(Plugin.Actions)
+
+local Dropdown = require(Plugin.Components.Dropdown)
+local Layout = require(Plugin.Components.Layout)
+
+local e = Roact.createElement
+
+export type SettingsInputProps = {
+	order: number?,
+}
+
+export type CreateInputOptions = {
+	heading: string,
+	hint: string?,
+
+	settingsKey: string,
+
+	enumMap: {
+		[string]: {
+			label: string,
+			hint: string,
+		},
+	},
+}
+
+return function(options: CreateInputOptions)
+	local DROPDOWN_OPTIONS = Sift.Dictionary.values(Sift.Dictionary.map(options.enumMap, function(details, enumItem)
+		return {
+			label = details.label,
+			hint = details.hint,
+			value = enumItem,
+		}
+	end))
+
+	local function SettingsInput(props: SettingsInputProps, hooks)
+		local dispatch = RoduxHooks.useDispatch(hooks)
+
+		local userSettings = RoduxHooks.useSelector(hooks, function(state)
+			return state.userSettings
+		end)
+
+		local value = userSettings[options.settingsKey]
+		local details = options.enumMap[value] or {}
+
+		return e(Layout.Forms.Section, {
+			heading = options.heading,
+			hint = options.hint,
+			formItem = true,
+			order = props.order,
+		}, {
+			selection = e(Dropdown, {
+				label = details.label,
+				hint = details.hint,
+				value = value,
+				options = DROPDOWN_OPTIONS,
+
+				onChanged = function(value)
+					dispatch(Actions.SetSetting({
+						key = options.settingsKey,
+						value = value,
+					}))
+				end,
+			}),
+		})
+	end
+
+	return Hooks.new(Roact)(SettingsInput)
+end
+]]></string>
+              </Properties>
+            </Item>
+            <Item class="ModuleScript" referent="48">
+              <Properties>
+                <string name="Name">EnumFormat</string>
+                <string name="Source"><![CDATA[local Plugin = script.Parent.Parent.Parent.Parent.Parent
+
+local Enums = require(Plugin.Data.Enums)
+local CreateInput = require(script.Parent.CreateInput)
+
+return CreateInput({
+	heading = "Enum Format",
+	hint = "Configure how Enum values are displayed in code snippets.",
+
+	settingsKey = "enumFormat",
+
+	enumMap = {
+		[Enums.EnumFormat.Full] = {
+			label = "Full",
+			hint = "Enum.ScaleType.Fit",
+		},
+
+		[Enums.EnumFormat.Number] = {
+			label = "Number",
+			hint = "3",
+		},
+
+		[Enums.EnumFormat.String] = {
+			label = "String",
+			hint = '"Fit"',
+		},
+	},
+})
+]]></string>
+              </Properties>
+            </Item>
+            <Item class="ModuleScript" referent="49">
+              <Properties>
+                <string name="Name">FontFormat</string>
+                <string name="Source"><![CDATA[local Plugin = script.Parent.Parent.Parent.Parent.Parent
+
+local Enums = require(Plugin.Data.Enums)
+local CreateInput = require(script.Parent.CreateInput)
+
+return CreateInput({
+	heading = "Font Format",
+	hint = "Configure how FontFace values are displayed in code snippets.",
+
+	settingsKey = "fontFormat",
+
+	enumMap = {
+		[Enums.FontFormat.Full] = {
+			label = "Full",
+			hint = "Font.new",
+		},
+
+		[Enums.FontFormat.Smart] = {
+			label = "Smart",
+			hint = "Font.fromEnum, Font.new",
+		},
+	},
+})
+]]></string>
+              </Properties>
+            </Item>
+            <Item class="ModuleScript" referent="50">
+              <Properties>
+                <string name="Name">NamingScheme</string>
+                <string name="Source"><![CDATA[local Plugin = script.Parent.Parent.Parent.Parent.Parent
+
+local Enums = require(Plugin.Data.Enums)
+local CreateInput = require(script.Parent.CreateInput)
+
+return CreateInput({
+	heading = "Naming Scheme",
+	hint = "Configure how child Instance names are generated.",
+
+	settingsKey = "namingScheme",
+
+	enumMap = {
+		[Enums.NamingScheme.All] = {
+			label = "All",
+			hint = "frame, textButton",
+		},
+
+		[Enums.NamingScheme.Changed] = {
+			label = "Changed",
+			hint = "myButton",
+		},
+
+		[Enums.NamingScheme.None] = {
+			label = "None",
+		},
+	},
+})
+]]></string>
+              </Properties>
+            </Item>
+            <Item class="ModuleScript" referent="51">
+              <Properties>
+                <string name="Name">NumberRangeFormat</string>
+                <string name="Source"><![CDATA[local Plugin = script.Parent.Parent.Parent.Parent.Parent
+
+local Enums = require(Plugin.Data.Enums)
+local CreateInput = require(script.Parent.CreateInput)
+
+return CreateInput({
+	heading = "NumberRange Format",
+	hint = "Configure how NumberRange values are displayed in code snippets.",
+
+	settingsKey = "numberRangeFormat",
+
+	enumMap = {
+		[Enums.NumberRangeFormat.Full] = {
+			label = "Full",
+			hint = "NumberRange.new(x, y)",
+		},
+
+		[Enums.NumberRangeFormat.Smart] = {
+			label = "Smart",
+			hint = "NumberRange.new(n)",
+		},
+	},
+})
+]]></string>
+              </Properties>
+            </Item>
+            <Item class="ModuleScript" referent="52">
+              <Properties>
+                <string name="Name">PhysicalPropertiesFormat</string>
+                <string name="Source"><![CDATA[local Plugin = script.Parent.Parent.Parent.Parent.Parent
+
+local Enums = require(Plugin.Data.Enums)
+local CreateInput = require(script.Parent.CreateInput)
+
+return CreateInput({
+	heading = "PhysicalProperties Format",
+	hint = "Configure how custom PhysicalProperties are displayed in code snippets.",
+
+	settingsKey = "physicalPropertiesFormat",
+
+	enumMap = {
+		[Enums.PhysicalPropertiesFormat.Full] = {
+			label = "Full",
+			hint = "PhysicalProperties.new(1, 2, 3, 4, 5)",
+		},
+
+		[Enums.PhysicalPropertiesFormat.Smart] = {
+			label = "Smart",
+			hint = "PhysicalProperties.new(Enum.Material.Grass)",
+		},
+	},
+})
+]]></string>
+              </Properties>
+            </Item>
+            <Item class="ModuleScript" referent="53">
+              <Properties>
+                <string name="Name">UDim2Format</string>
+                <string name="Source"><![CDATA[local Plugin = script.Parent.Parent.Parent.Parent.Parent
+
+local Enums = require(Plugin.Data.Enums)
+local CreateInput = require(script.Parent.CreateInput)
+
+return CreateInput({
+	heading = "UDim2 Format",
+	hint = "Configure how UDim2 values are displayed in code snippets.",
+
+	settingsKey = "udim2Format",
+
+	enumMap = {
+		[Enums.UDim2Format.Full] = {
+			label = "Full",
+			hint = "UDim2.new",
+		},
+
+		[Enums.UDim2Format.Smart] = {
+			label = "Smart",
+			hint = "UDim2.fromScale, fromOffset",
+		},
+	},
+})
+]]></string>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="ModuleScript" referent="54">
+            <Properties>
+              <string name="Name">ParallelLuauToggle</string>
+              <string name="Source"><![CDATA[local Plugin = script.Parent.Parent.Parent.Parent
+
+local RoduxHooks = require(Plugin.Packages.RoduxHooks)
+local Roact = require(Plugin.Packages.Roact)
+local Hooks = require(Plugin.Packages.Hooks)
+
+local Actions = require(Plugin.Actions)
+
+local Checkbox = require(Plugin.Components.Checkbox)
+local Layout = require(Plugin.Components.Layout)
+
+local e = Roact.createElement
+
+export type ParallelLuauToggleProps = {
+	order: number?,
+}
+
+local function ParallelLuauToggle(props: ParallelLuauToggleProps, hooks)
+	local dispatch = RoduxHooks.useDispatch(hooks)
+
+	local userSettings = RoduxHooks.useSelector(hooks, function(state)
+		return state.userSettings
+	end)
+
+	local value = userSettings.parallelLuauGeneration
+
+	return e(Layout.Forms.Section, {
+		heading = "Parallel Luau",
+		hint = "Use parallel Luau to generate code snippets. This should prevent Studio from becoming unresponsive while generating code, but still may take a while and cause lag.",
+		formItem = true,
+		order = props.order,
+	}, {
+		value = e(Checkbox, {
+			label = "Parallel Luau",
+			order = 10,
+			value = value,
+			disabled = not task or not (task.synchronize and task.desynchronize),
+
+			onChanged = function(value)
+				dispatch(Actions.SetSetting({
+					key = "parallelLuauGeneration",
+					value = value,
+				}))
+			end,
+		}),
+	})
+end
+
+return Hooks.new(Roact)(ParallelLuauToggle)
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="55">
+            <Properties>
+              <string name="Name">SyntaxHighlighting</string>
+              <string name="Source"><![CDATA[local Plugin = script.Parent.Parent.Parent.Parent
+
+local RoduxHooks = require(Plugin.Packages.RoduxHooks)
+local Roact = require(Plugin.Packages.Roact)
+local Hooks = require(Plugin.Packages.Hooks)
+
+local Actions = require(Plugin.Actions)
+
+local Checkbox = require(Plugin.Components.Checkbox)
+local Layout = require(Plugin.Components.Layout)
+
+local e = Roact.createElement
+
+export type SyntaxHighlightingProps = {
+	order: number?,
+}
+
+local function SyntaxHighlighting(props: SyntaxHighlightingProps, hooks)
+	local dispatch = RoduxHooks.useDispatch(hooks)
+
+	local userSettings = RoduxHooks.useSelector(hooks, function(state)
+		return state.userSettings
+	end)
+
+	local value = userSettings.syntaxHighlighting
+
+	return e(Layout.Forms.Section, {
+		heading = "Syntax Highlighting",
+		hint = "Enable syntax highlighting in code snippets. Turn this off to increase performance.",
+		formItem = true,
+		order = props.order,
+	}, {
+		value = e(Checkbox, {
+			label = "Highlight Code Snippets",
+			order = 10,
+			value = value,
+
+			onChanged = function(value)
+				dispatch(Actions.SetSetting({
+					key = "syntaxHighlighting",
+					value = value,
+				}))
+			end,
+		}),
+	})
+end
+
+return Hooks.new(Roact)(SyntaxHighlighting)
+]]></string>
+            </Properties>
+          </Item>
+        </Item>
+      </Item>
+      <Item class="ModuleScript" referent="56">
+        <Properties>
+          <string name="Name">Routing</string>
+          <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local StudioTheme = require(Packages.StudioTheme)
+local RoactRouter = require(Packages.RoactRouter)
+local Hooks = require(Packages.Hooks)
+
+local Navigation = require(script.Parent.Navigation)
+local Pages = require(script.Parent.Pages)
+
+local e = Roact.createElement
+
+local function Routing(_, hooks)
+	local theme = StudioTheme.useTheme(hooks)
+
+	return e("Frame", {
+		BackgroundColor3 = theme:GetColor(Enum.StudioStyleGuideColor.MainBackground),
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 1),
+	}, {
+		router = e(RoactRouter.Router, {}, {
+			navigationTabs = e(Navigation.Container, nil, {
+				home = e(Navigation.Tab, {
+					label = "Codify",
+					icon = "Brand",
+					order = 10,
+					location = "/",
+				}),
+
+				settings = e(Navigation.Tab, {
+					label = "Settings",
+					icon = "Settings",
+					order = 20,
+					location = "/settings",
+				}),
+			}),
+
+			content = e("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(0, 36),
+				Size = UDim2.new(1, 0, 1, -36),
+			}, {
+				home = e(RoactRouter.Route, {
+					path = "/",
+					exact = true,
+					component = Pages.Home,
+				}),
+
+				settings = e(RoactRouter.Route, {
+					path = "/settings",
+					exact = true,
+					component = Pages.Settings,
+				}),
+			}),
+		}),
+	})
+end
+
+return Hooks.new(Roact)(Routing)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="57">
+        <Properties>
+          <string name="Name">Text</string>
+          <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local Hooks = require(Packages.Hooks)
+local StudioTheme = require(Packages.StudioTheme)
+
+local e = Roact.createElement
+
+export type TextProps = {
+	autoSize: Enum.AutomaticSize?,
+	position: UDim2?,
+	size: UDim2?,
+	font: Enum.Font?,
+	richText: boolean?,
+	text: string?,
+	textColor: Color3?,
+	textSize: number?,
+	textTransparency: number?,
+	textScaled: boolean?,
+	wrapped: boolean?,
+	alignX: Enum.TextXAlignment?,
+	alignY: Enum.TextYAlignment?,
+	truncate: Enum.TextTruncate?,
+	zindex: number?,
+	order: number?,
+	clipsDescendants: boolean?,
+
+	onAbsoluteSizeChanged: ((TextLabel) -> ())?,
+}
+
+local function Text(props: TextProps, hooks)
+	local theme, styles = StudioTheme.useTheme(hooks)
+
+	return e("TextLabel", {
+		AutomaticSize = props.autoSize or Enum.AutomaticSize.XY,
+		BackgroundTransparency = 1,
+		LayoutOrder = props.order,
+		Position = props.position,
+		Size = props.size,
+		ZIndex = props.zindex,
+		ClipsDescendants = props.clipsDescendants,
+		Font = props.font or styles.font.default,
+		RichText = props.richText,
+		Text = props.text,
+		TextColor3 = props.textColor or theme:GetColor(Enum.StudioStyleGuideColor.MainText),
+		TextSize = props.textSize or styles.fontSize,
+		TextWrapped = if props.wrapped ~= nil then props.wrapped else true,
+		TextXAlignment = props.alignX or Enum.TextXAlignment.Left,
+		TextYAlignment = props.alignY or Enum.TextYAlignment.Top,
+		TextTruncate = props.truncate,
+		TextScaled = props.textScaled,
+		TextTransparency = props.textTransparency,
+
+		[Roact.Change.AbsoluteSize] = props.onAbsoluteSizeChanged,
+	}, props[Roact.Children])
+end
+
+return Hooks.new(Roact)(Text)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="58">
+        <Properties>
+          <string name="Name">TextInput</string>
+          <string name="Source"><![CDATA[local Packages = script.Parent.Parent.Packages
+
+local Roact = require(Packages.Roact)
+local Hooks = require(Packages.Hooks)
+local StudioTheme = require(Packages.StudioTheme)
+local Highlighter = require(Packages.Highlighter)
+
+local Layout = require(script.Parent.Layout)
+local Text = require(script.Parent.Text)
+
+local e = Roact.createElement
+
+export type TextInputProps = {
+	autoSize: Enum.AutomaticSize?,
+	disabled: boolean?,
+	readonly: boolean?,
+	text: string?,
+	textSize: number?,
+	textColor: (Color3 | Enum.StudioStyleGuideColor)?,
+	size: UDim2?,
+	position: UDim2?,
+	zindex: number?,
+	order: number?,
+	font: Enum.Font?,
+	multiline: boolean?,
+	wrapped: boolean?,
+	placeholder: string?,
+	maxHeight: number?,
+	selectAllOnFocus: boolean?,
+	syntaxHighlight: boolean?,
+	caption: string?,
+
+	onChanged: ((TextBox) -> ())?,
+	onSubmit: ((TextBox) -> ())?,
+	onFocus: ((TextBox) -> ())?,
+	onFocusLost: ((TextBox) -> ())?,
+}
+
+local function TextInput(props: TextInputProps, hooks)
+	local theme, styles = StudioTheme.useTheme(hooks)
+
+	local hover, setHover = hooks.useState(false)
+	local press, setPress = hooks.useState(false)
+	local focus, setFocus = hooks.useState(false)
+	local height, setHeight = hooks.useState(400)
+	local captionHeight, setCaptionHeight = hooks.useState(0)
+
+	local inputRef = hooks.useValue(Roact.createRef())
+
+	local colors = hooks.useMemo(function()
+		local modifiers = { background = nil, foreground = nil, border = nil, placeholder = nil, caption = nil }
+
+		if props.disabled then
+			modifiers.background = Enum.StudioStyleGuideModifier.Disabled
+			modifiers.foreground = Enum.StudioStyleGuideModifier.Disabled
+			modifiers.border = Enum.StudioStyleGuideModifier.Disabled
+			modifiers.placeholder = Enum.StudioStyleGuideModifier.Disabled
+			modifiers.caption = Enum.StudioStyleGuideModifier.Disabled
+		elseif focus then
+			modifiers.background = Enum.StudioStyleGuideModifier.Selected
+			modifiers.foreground = Enum.StudioStyleGuideModifier.Default
+			modifiers.border = Enum.StudioStyleGuideModifier.Selected
+			modifiers.placeholder = Enum.StudioStyleGuideModifier.Selected
+			modifiers.caption = Enum.StudioStyleGuideModifier.Selected
+		elseif press then
+			modifiers.background = Enum.StudioStyleGuideModifier.Pressed
+			modifiers.foreground = Enum.StudioStyleGuideModifier.Pressed
+			modifiers.border = Enum.StudioStyleGuideModifier.Pressed
+			modifiers.placeholder = Enum.StudioStyleGuideModifier.Pressed
+			modifiers.caption = Enum.StudioStyleGuideModifier.Pressed
+		elseif hover then
+			modifiers.background = Enum.StudioStyleGuideModifier.Hover
+			modifiers.foreground = Enum.StudioStyleGuideModifier.Hover
+			modifiers.border = Enum.StudioStyleGuideModifier.Hover
+			modifiers.placeholder = Enum.StudioStyleGuideModifier.Hover
+			modifiers.caption = Enum.StudioStyleGuideModifier.Hover
+		else
+			modifiers.caption = Enum.StudioStyleGuideModifier.Disabled
+		end
+
+		return {
+			background = theme:GetColor(Enum.StudioStyleGuideColor.InputFieldBackground, modifiers.background),
+			border = theme:GetColor(Enum.StudioStyleGuideColor.InputFieldBorder, modifiers.border),
+			placeholder = theme:GetColor(Enum.StudioStyleGuideColor.DimmedText, modifiers.placeholder),
+			foreground = theme:GetColor(Enum.StudioStyleGuideColor.MainText, modifiers.foreground),
+			caption = theme:GetColor(Enum.StudioStyleGuideColor.MainText, modifiers.caption),
+		}
+	end, { hover, press, focus, props.disabled, theme })
+
+	local onInputBegan = hooks.useCallback(function(_, input: InputObject)
+		if props.disabled then
+			return
+		end
+
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			setHover(true)
+		elseif input.UserInputType.Name:match("MouseButton%d+") then
+			setPress(true)
+		end
+	end, { props.disabled })
+
+	local function onInputEnded(_, input: InputObject)
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			setHover(false)
+			setPress(false)
+		elseif input.UserInputType.Name:match("MouseButton%d+") then
+			setPress(false)
+		end
+	end
+
+	local function onInputChanged(_, input: InputObject)
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			setHover(true)
+		end
+	end
+
+	return e("ImageButton", {
+		Active = not props.disabled,
+		AutoButtonColor = false,
+		BackgroundColor3 = colors.border,
+		Position = props.position,
+		LayoutOrder = props.order,
+		Size = UDim2.new(
+			1,
+			0,
+			0,
+			height + 2 + (styles.spacing * 2) + (props.caption and (captionHeight + (styles.spacing / 2)) or 0)
+		),
+		ZIndex = props.zindex,
+		Image = "",
+
+		[Roact.Event.InputBegan] = onInputBegan,
+		[Roact.Event.InputEnded] = onInputEnded,
+		[Roact.Event.InputChanged] = onInputChanged,
+
+		[Roact.Event.Activated] = function()
+			local input = inputRef.value:getValue()
+
+			if input then
+				input:CaptureFocus()
+			end
+		end,
+	}, {
+		corners = e(Layout.Corner),
+		padding = e(Layout.Padding, { 1 }),
+
+		layout = e(Layout.ListLayout, {
+			direction = Enum.FillDirection.Vertical,
+			gap = styles.spacing / 2,
+		}),
+
+		caption = props.caption and e(Text, {
+			autoSize = Enum.AutomaticSize.Y,
+			size = UDim2.fromScale(1, 0),
+			text = props.caption,
+			textColor = colors.caption,
+			order = 10,
+
+			onAbsoluteSizeChanged = function(rbx)
+				setCaptionHeight(rbx.AbsoluteSize.Y)
+			end,
+		}, {
+			padding = e(Layout.Padding, {
+				bottom = styles.spacing / 2,
+			}),
+		}),
+
+		content = e("Frame", {
+			BackgroundColor3 = colors.background,
+			Size = UDim2.new(1, 0, 0, height + styles.spacing * 2),
+			LayoutOrder = 20,
+			ClipsDescendants = true,
+		}, {
+			padding = e(Layout.Padding),
+
+			corners = e(Layout.Corner, {
+				radius = styles.borderRadius - 1,
+			}),
+
+			input = e("TextBox", {
+				Active = not props.disabled,
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 0, height),
+				Font = props.font or styles.font.default,
+				Text = props.text,
+				TextSize = props.textSize or styles.fontSize,
+				TextColor3 = colors.foreground,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Top,
+				ClearTextOnFocus = false,
+				TextEditable = not (props.readonly or props.disabled),
+				TextWrapped = props.wrapped,
+				Selectable = not props.disabled,
+				ClipsDescendants = true,
+				MultiLine = props.multiline,
+				PlaceholderText = props.placeholder,
+				PlaceholderColor3 = colors.placeholder,
+
+				[Roact.Ref] = inputRef.value,
+				[Roact.Change.TextBounds] = function(rbx: TextBox)
+					setHeight(rbx.TextBounds.Y + 2)
+
+					if props.syntaxHighlight then
+						Highlighter.highlight({
+							textObject = rbx,
+							forceUpdate = true,
+						})
+					end
+				end,
+
+				[Roact.Change.AbsoluteSize] = function(rbx: TextBox)
+					if props.syntaxHighlight then
+						Highlighter.highlight({
+							textObject = rbx,
+							forceUpdate = true,
+						})
+					end
+				end,
+
+				[Roact.Change.Text] = function(rbx: TextBox, ...)
+					if props.onChanged then
+						task.spawn(props.onChanged, rbx, ...)
+					end
+
+					if props.syntaxHighlight then
+						Highlighter.highlight({
+							textObject = rbx,
+						})
+					end
+				end,
+
+				[Roact.Event.Focused] = function(rbx: TextBox)
+					setFocus(true)
+
+					if props.selectAllOnFocus then
+						rbx.CursorPosition = #rbx.Text + 1
+						rbx.SelectionStart = 1
+					end
+
+					if props.onFocus then
+						props.onFocus(rbx)
+					end
+				end,
+
+				[Roact.Event.FocusLost] = function(rbx: TextBox, enterPressed: boolean)
+					setFocus(false)
+					setHover(false)
+					setPress(false)
+
+					if enterPressed and props.onSubmit then
+						props.onSubmit(rbx)
+					end
+
+					if props.onFocusLost then
+						props.onFocusLost(rbx)
+					end
+				end,
+			}, {
+				maxHeight = if props.maxHeight
+					then e("UISizeConstraint", {
+						MaxSize = Vector2.new(math.huge, props.maxHeight),
+					})
+					else nil,
+			}),
+		}),
+	})
+end
+
+return Hooks.new(Roact)(TextInput, {
+	defaultProps = {
+		autoSize = Enum.AutomaticSize.Y,
+		size = UDim2.fromScale(1, 0),
+		wrapped = true,
+		text = "",
+	},
+})
+]]></string>
+        </Properties>
+      </Item>
+    </Item>
+    <Item class="Folder" referent="59">
+      <Properties>
+        <string name="Name">Data</string>
+      </Properties>
+      <Item class="ModuleScript" referent="60">
+        <Properties>
+          <string name="Name">Config</string>
+          <string name="Source"><![CDATA[return {
+	pluginId = {
+		stable = 4749111907,
+		preview = 8903547414,
+		canary = 8827700015,
+	},
+
+	icons = {
+		stable = "rbxassetid://8730522354",
+	},
+
+	version = "2.2.5",
+	repo = "csqrl/codify-plugin",
+
+	authors = {
+		{ userId = 3659905 },
+		{ userId = 33655127 },
+	},
+}
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="61">
+        <Properties>
+          <string name="Name">Enums</string>
+          <string name="Source"><![CDATA[return {
+	BrickColorFormat = require(script.BrickColorFormat),
+	Color3Format = require(script.Color3Format),
+	EnumFormat = require(script.EnumFormat),
+	Framework = require(script.Framework),
+	FontFormat = require(script.FontFormat),
+	NamingScheme = require(script.NamingScheme),
+	NumberRangeFormat = require(script.NumberRangeFormat),
+	PhysicalPropertiesFormat = require(script.PhysicalPropertiesFormat),
+	UDim2Format = require(script.UDim2Format),
+}
+]]></string>
+        </Properties>
+        <Item class="ModuleScript" referent="62">
+          <Properties>
+            <string name="Name">BrickColorFormat</string>
+            <string name="Source"><![CDATA[return {
+	Name = "Name",
+	RGB = "RGB",
+	Number = "Number",
+	Smart = "Smart",
+}
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="63">
+          <Properties>
+            <string name="Name">Color3Format</string>
+            <string name="Source"><![CDATA[return {
+	Hex = "Hex",
+	RGB = "RGB",
+	HSV = "HSV",
+	Full = "Full",
+}
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="64">
+          <Properties>
+            <string name="Name">EnumFormat</string>
+            <string name="Source"><![CDATA[return {
+	Full = "Full",
+	Number = "Number",
+	String = "String",
+}
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="65">
+          <Properties>
+            <string name="Name">FontFormat</string>
+            <string name="Source"><![CDATA[return {
+	Full = "Full",
+	Smart = "Smart",
+}
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="66">
+          <Properties>
+            <string name="Name">Framework</string>
+            <string name="Source"><![CDATA[return {
+	Regular = "Regular",
+	Roact = "Roact",
+	Fusion = "Fusion",
+}
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="67">
+          <Properties>
+            <string name="Name">NamingScheme</string>
+            <string name="Source"><![CDATA[return {
+	All = "All",
+	None = "None",
+	Changed = "Changed",
+}
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="68">
+          <Properties>
+            <string name="Name">NumberRangeFormat</string>
+            <string name="Source"><![CDATA[return {
+	Smart = "Smart",
+	Full = "Full",
+}
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="69">
+          <Properties>
+            <string name="Name">PhysicalPropertiesFormat</string>
+            <string name="Source"><![CDATA[return {
+	Full = "Full",
+	Smart = "Smart",
+}
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="70">
+          <Properties>
+            <string name="Name">UDim2Format</string>
+            <string name="Source"><![CDATA[return {
+	Smart = "Smart",
+	Full = "Full",
+}
+]]></string>
+          </Properties>
+        </Item>
+      </Item>
+    </Item>
+    <Item class="ModuleScript" referent="71">
+      <Properties>
+        <string name="Name">IconMap</string>
+        <string name="Source"><![CDATA[return {
+	Settings = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 4,
+		y = 4,
+	},
+	Brand = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 24,
+		y = 4,
+	},
+	Target = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 44,
+		y = 4,
+	},
+	Download = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 4,
+		y = 24,
+	},
+	Script = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 24,
+		y = 24,
+	},
+	Cloud = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 44,
+		y = 24,
+	},
+	Caret = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 4,
+		y = 44,
+	},
+	Tick = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 24,
+		y = 44,
+	},
+	Cross = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 44,
+		y = 44,
+	},
+	FrameworkFusion = {
+		Dark = {
+			assetId = "rbxassetid://11459333521",
+			color = Color3.fromRGB(255, 255, 255),
+			w = 16,
+			h = 16,
+			x = 4,
+			y = 64,
+		},
+		Light = {
+			assetId = "rbxassetid://11459333521",
+			color = Color3.fromRGB(255, 255, 255),
+			w = 16,
+			h = 16,
+			x = 24,
+			y = 64,
+		},
+	},
+	FrameworkRoact = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 44,
+		y = 64,
+	},
+	FrameworkRegular = {
+		assetId = "rbxassetid://11459333521",
+		color = Color3.fromRGB(0, 162, 255),
+		w = 16,
+		h = 16,
+		x = 4,
+		y = 84,
+	},
+	FrameworkTypescript = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 24,
+		y = 84,
+	},
+	FrameworkRojo = {
+		assetId = "rbxassetid://11459333521",
+		color = Color3.fromHex("e13835"),
+		w = 16,
+		h = 16,
+		x = 44,
+		y = 84,
+	},
+	Warning = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 64,
+		y = 4,
+	},
+	WarningCircle = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 64,
+		y = 24,
+	},
+	Fire = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 64,
+		y = 44,
+	},
+	Info = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 64,
+		y = 64,
+	},
+	Lightbulb = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 64,
+		y = 84,
+	},
+	Critical = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 84,
+		y = 4,
+	},
+	Triangle = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 84,
+		y = 24,
+	},
+	Eye = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 84,
+		y = 44,
+	},
+	Reload = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 84,
+		y = 64,
+	},
+	CloudWarning = {
+		assetId = "rbxassetid://11459333521",
+		w = 16,
+		h = 16,
+		x = 84,
+		y = 84,
+	},
+}
+]]></string>
+      </Properties>
+    </Item>
+    <Item class="Folder" referent="72">
+      <Properties>
+        <string name="Name">Lib</string>
+      </Properties>
+      <Item class="ModuleScript" referent="73">
+        <Properties>
+          <string name="Name">Codify</string>
+          <string name="Source"><![CDATA[local Sift = require(script.Parent.Parent.Packages.Sift)
+local Frameworks = require(script.Frameworks)
+
+export type CodifyOptions = {
+	Framework: string?,
+	CreateMethod: string?,
+	Color3Format: string?,
+	UDim2Format: string?,
+	EnumFormat: string?,
+	NamingScheme: string?,
+	NumberRangeFormat: string?,
+	TabCharacter: string?,
+	Indent: number?,
+	PhysicalPropertiesFormat: string?,
+	BrickColorFormat: string?,
+	FontFormat: string?,
+
+	ChildrenKey: string?, -- customise Fusion's [Children] key
+}
+
+type CodifyInstanceOptions = CodifyOptions & {
+	PropIndent: number,
+	LevelIdentifiers: {
+		[string]: number,
+	}?,
+}
+
+local DEFAULT_OPTIONS: CodifyOptions = {
+	Framework = "Regular",
+	NamingScheme = "All",
+	TabCharacter = "  ",
+	Indent = 0,
+}
+
+local function CodifyInstance(instance: Instance, options: CodifyInstanceOptions)
+	local generator = Frameworks[options.Framework].Generator
+	return generator(instance, options)
+end
+
+local function Codify(rootInstance: Instance, options: CodifyOptions?)
+	local config = Sift.Dictionary.merge(DEFAULT_OPTIONS, options or {}, {
+		LevelIdentifiers = {},
+	}) :: CodifyInstanceOptions
+
+	return (config.Framework ~= "Regular" and "return " or "") .. CodifyInstance(rootInstance, config)
+end
+
+return Codify
+]]></string>
+        </Properties>
+        <Item class="ModuleScript" referent="74">
+          <Properties>
+            <string name="Name">Frameworks</string>
+            <string name="Source"><![CDATA[return {
+	Fusion = require(script.Fusion),
+	Regular = require(script.Regular),
+	Roact = require(script.Roact),
+}
+]]></string>
+          </Properties>
+          <Item class="ModuleScript" referent="75">
+            <Properties>
+              <string name="Name">Fusion</string>
+              <string name="Source"><![CDATA[local Serialize = require(script.Parent.Parent.Serialize)
+local Script = require(script.Parent.Parent.Script)
+local Properties = require(script.Parent.Parent.Parent.Properties)
+
+local concat = table.concat
+local fmt = string.format
+
+local function FusionifyInstance(instance: Instance, options)
+	local createMethod = options.CreateMethod or "New"
+	local snippet = Script.new()
+
+	if options.ParallelLuau then
+		task.synchronize()
+	end
+
+	local success, changedProps = Properties.GetChangedProperties(instance):await()
+	local children = instance:GetChildren()
+
+	if not success then
+		error("Failed to get changed properties: " .. tostring(changedProps), 2)
+	end
+
+	if options.ParallelLuau then
+		task.desynchronize()
+	end
+
+	local function tab()
+		return string.rep(options.TabCharacter, options.Indent)
+	end
+
+	snippet:CreateLine():Push(createMethod, ' "', instance.ClassName, '" {')
+	options.Indent += 1
+
+	local nameChanged = table.find(changedProps, "Name")
+	local name: string = nil
+
+	if options.NamingScheme == "All" or (options.NamingScheme == "Changed" and nameChanged) then
+		name = instance.Name
+
+		snippet:CreateLine():Push(tab(), "Name = ", string.format("%q", name), ",")
+
+		if #children > 0 and #changedProps == 0 then
+			snippet:CreateLine()
+		end
+	end
+
+	if #changedProps > 0 then
+		for _, prop in ipairs(changedProps) do
+			if prop == "Name" then
+				continue
+			end
+
+			local value = Serialize.SerialiseProperty(instance, prop, options)
+
+			if value == nil then
+				continue
+			end
+
+			options.PropIndent = #prop + 3
+			snippet:CreateLine():Push(tab(), prop, " = ", value, ",")
+		end
+
+		if #children > 0 then
+			snippet:CreateLine()
+		end
+	end
+
+	if #children > 0 then
+		snippet:CreateLine():Push(tab(), fmt("[%s] = {", options.ChildrenKey or "Children"))
+		options.Indent += 1
+
+		for index, child in ipairs(children) do
+			if index > 1 then
+				snippet:CreateLine()
+			end
+
+			snippet:CreateLine():Push(tab(), FusionifyInstance(child, options), ",")
+		end
+
+		options.Indent -= 1
+		snippet:CreateLine():Push(tab(), "}")
+	end
+
+	options.Indent -= 1
+	if #changedProps == 0 and #children == 0 and not name then
+		snippet:Line():Push(" }")
+	else
+		snippet:CreateLine():Push(tab(), "}")
+	end
+
+	return snippet:Concat()
+end
+
+return {
+	Generator = FusionifyInstance,
+
+	Sample = concat({
+		'return New "Lorem" {',
+		'  ipsum = "dolor"',
+		'  sit = "amet"',
+		'  consectetur = "adipiscing"',
+		'  elit = "sed"',
+		'  do = "eiusmod"',
+		'  tempor = "incididunt"',
+		"}",
+	}, "\n"),
+}
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="76">
+            <Properties>
+              <string name="Name">Regular</string>
+              <string name="Source"><![CDATA[local Properties = require(script.Parent.Parent.Parent.Properties)
+local GetSafeName = require(script.Parent.Parent.GetSafeName)
+local Serialise = require(script.Parent.Parent.Serialize)
+local Script = require(script.Parent.Parent.Script)
+
+local concat = table.concat
+local fmt = string.format
+
+local function Regularify(instance: Instance, options)
+	local output = Script.new()
+
+	if options.ParallelLuau then
+		task.synchronize()
+	end
+
+	local success, changedProps = Properties.GetChangedProperties(instance):await()
+	local children = instance:GetChildren()
+
+	if not success then
+		error("Failed to get changed properties: " .. tostring(changedProps), 2)
+	end
+
+	if options.ParallelLuau then
+		task.desynchronize()
+	end
+
+	if not options._instanceNames then
+		options._instanceNames = {}
+	end
+
+	local name = GetSafeName(instance)
+
+	if options._instanceNames[name] == nil then
+		options._instanceNames[name] = 0
+	else
+		options._instanceNames[name] += 1
+		name ..= options._instanceNames[name]
+	end
+
+	output:CreateLine():Push(fmt("local %s = Instance.new(%q)", name, instance.ClassName))
+
+	local isNameChanged = table.find(changedProps, "Name")
+
+	if options.NamingScheme == "All" or (options.NamingScheme == "Changed" and isNameChanged) then
+		output:CreateLine():Push(fmt("%s.Name = %q", name, instance.Name))
+	end
+
+	if #changedProps > 0 then
+		for _, property in ipairs(changedProps) do
+			if property == "Name" then
+				continue
+			end
+
+			local value = Serialise.SerialiseProperty(instance, property, options)
+
+			if value == nil then
+				continue
+			end
+
+			options.PropIndent = #property + 3
+			output:CreateLine():Push(fmt("%s.%s = %s", name, property, value))
+		end
+	end
+
+	if #children > 0 then
+		for index, child in ipairs(children) do
+			output:CreateLine()
+
+			local snippet, childName = Regularify(child, options)
+
+			output:CreateLine():Push(snippet)
+			output:CreateLine():Push(fmt("%s.Parent = %s", childName, name))
+
+			if index == #children then
+				output:CreateLine()
+			end
+		end
+	end
+
+	return output:Concat(), name
+end
+
+return {
+	Generator = Regularify,
+	Sample = concat({
+		'local lorem = Instance.new("Lorem")',
+		'lorem.ipsum = "dolor"',
+		'lorem.sit = "amet"',
+		'lorem.consectetur = "adipiscing"',
+		'lorem.elit = "sed"',
+		'lorem.do = "eiusmod"',
+		'lorem.tempor = "incididunt"',
+	}, "\n"),
+}
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="77">
+            <Properties>
+              <string name="Name">Roact</string>
+              <string name="Source"><![CDATA[local Serialize = require(script.Parent.Parent.Serialize)
+local Script = require(script.Parent.Parent.Script)
+local Properties = require(script.Parent.Parent.Parent.Properties)
+
+local getSafeVarName = require(script.Parent.Parent.GetSafeName)
+
+local function RoactifyInstance(instance: Instance, options)
+	local createMethod = options.CreateMethod or "Roact.createElement"
+	local snippet = Script.new()
+
+	if options.ParallelLuau then
+		task.synchronize()
+	end
+
+	local success, changedProps = Properties.GetChangedProperties(instance):await()
+	local children = instance:GetChildren()
+
+	if not success then
+		error("Failed to get changed properties: " .. tostring(changedProps), 2)
+	end
+
+	if options.ParallelLuau then
+		task.desynchronize()
+	end
+
+	local function tab()
+		return string.rep(options.TabCharacter, options.Indent)
+	end
+
+	snippet:CreateLine():Push(createMethod, '("', instance.ClassName, '"')
+
+	if options.Indent > 0 then
+		local nameChanged = table.find(changedProps, "Name")
+
+		if nameChanged then
+			table.remove(changedProps, nameChanged)
+		end
+
+		if options.NamingScheme == "All" or (options.NamingScheme == "Changed" and nameChanged) then
+			local name = getSafeVarName(instance)
+			if options.LevelIdentifiers[name] ~= nil then
+				options.LevelIdentifiers[name] += 1
+				name ..= tostring(options.LevelIdentifiers[name])
+			else
+				options.LevelIdentifiers[name] = 0
+			end
+
+			snippet:Line():Insert(1, name, " = ")
+		end
+	end
+
+	if #changedProps > 0 then
+		snippet:Line():Push(", {")
+		options.Indent += 1
+
+		for _, prop in ipairs(changedProps) do
+			if prop == "Name" then
+				continue
+			end
+
+			local value = Serialize.SerialiseProperty(instance, prop, options)
+
+			if value == nil then
+				continue
+			end
+
+			options.PropIndent = #prop + 3
+			snippet:CreateLine():Push(tab(), prop, " = ", value, ",")
+		end
+
+		options.Indent -= 1
+		snippet:CreateLine():Push(tab(), "}")
+	end
+
+	if #children > 0 then
+		snippet:Line():Push(", {")
+		options.Indent += 1
+
+		for index, child in ipairs(children) do
+			if index > 1 then
+				snippet:CreateLine()
+			end
+
+			snippet:CreateLine():Push(tab(), RoactifyInstance(child, options), ",")
+		end
+
+		options.Indent -= 1
+		snippet:CreateLine():Push(tab(), "}")
+	end
+
+	snippet:Line():Push(")")
+
+	return snippet:Concat()
+end
+
+return {
+	Generator = RoactifyInstance,
+	Sample = table.concat({
+		'return Roact.createElement("Lorem", {',
+		'  ipsum = "dolor"',
+		'  sit = "amet"',
+		'  consectetur = "adipiscing"',
+		'  elit = "sed"',
+		'  do = "eiusmod"',
+		'  tempor = "incididunt"',
+		"})",
+	}, "\n"),
+}
+]]></string>
+            </Properties>
+          </Item>
+        </Item>
+        <Item class="ModuleScript" referent="78">
+          <Properties>
+            <string name="Name">GetSafeName</string>
+            <string name="Source"><![CDATA[local split = string.split
+local match = string.match
+local lower = string.lower
+local gsub = string.gsub
+local sub = string.sub
+
+local DICTIONARY = split("abcdefghijklmnopqrstuvwxyz", "")
+
+local function CreateSafeName(name: string)
+	local firstChar = utf8.codepoint(sub(name, 1, 1))
+	local rest = gsub(sub(name, 2), "[^%w]", "_")
+
+	return DICTIONARY[firstChar % #DICTIONARY] .. rest
+end
+
+local function GetSafeName(instance: Instance)
+	local name = instance.Name
+
+	local matchedSafeName = { match(name, "([%a_])(.+)") }
+	local safeName
+
+	if #matchedSafeName == 2 then
+		safeName = lower(matchedSafeName[1]) .. matchedSafeName[2]
+		safeName = gsub(safeName, "[^%w_]", "_")
+	elseif match(name, "([%a_])") then
+		safeName = lower(name)
+	else
+		safeName = CreateSafeName(name)
+	end
+
+	return safeName
+end
+
+return GetSafeName
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="79">
+          <Properties>
+            <string name="Name">Script</string>
+            <string name="Source"><![CDATA[local Line = require(script.Parent.ScriptLine)
+
+local Script = {}
+Script.__index = Script
+
+function Script.new()
+	local self = setmetatable({}, Script)
+
+	self.Lines = {}
+
+	return self
+end
+
+function Script:CreateLine()
+	local line = Line.new()
+
+	table.insert(self.Lines, line)
+
+	return line
+end
+
+function Script:At(index: number)
+	return self.Lines[index]
+end
+
+function Script:Line(index: number?)
+	if index then
+		return self.Lines[index]
+	else
+		return self.Lines[#self.Lines]
+	end
+end
+
+function Script:Concat(separator: string?)
+	local lines = {}
+
+	for _, line in ipairs(self.Lines) do
+		table.insert(lines, line:Concat())
+	end
+
+	return table.concat(lines, separator or "\n")
+end
+
+return Script
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="80">
+          <Properties>
+            <string name="Name">ScriptLine</string>
+            <string name="Source"><![CDATA[local Line = {}
+Line.__index = Line
+
+function Line.new()
+	local self = setmetatable({}, Line)
+
+	self.Text = {}
+	self.Indent = 0
+
+	return self
+end
+
+function Line:Push(...: string)
+	local args = { ... }
+
+	for _, arg in ipairs(args) do
+		table.insert(self.Text, arg)
+	end
+end
+
+function Line:Insert(index: number, ...: string)
+	local args = { ... }
+
+	for argIndex, arg in ipairs(args) do
+		table.insert(self.Text, index + (argIndex - 1), arg)
+	end
+end
+
+function Line:Concat(separator: string?)
+	return table.concat(self.Text, separator or "")
+end
+
+return Line
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="81">
+          <Properties>
+            <string name="Name">Serialize</string>
+            <string name="Source"><![CDATA[local rep = string.rep
+local fmt = string.format
+local clamp = math.clamp
+
+type CodifyOptions = {
+	Framework: string?,
+	CreateMethod: string?,
+	BrickColorFormat: string?,
+	Color3Format: string?,
+	UDim2Format: string?,
+	EnumFormat: string?,
+	NamingScheme: string?,
+	NumberRangeFormat: string?,
+	PhysicalPropertiesFormat: string?,
+	TabCharacter: string?,
+	Indent: number?,
+	FontFormat: string?,
+}
+
+type CodifyInstanceOptions = CodifyOptions & {
+	PropIndent: number,
+	LevelIdentifiers: {
+		[string]: number,
+	}?,
+}
+
+type GuiTextObject = TextBox | TextLabel | TextButton
+
+local function FormatNumber(value: number): string
+	if value == math.huge then
+		return "math.huge"
+	elseif value == -math.huge then
+		return "-math.huge"
+	end
+
+	return fmt("%.3g", value)
+end
+
+local SHORT_BRICKCOLORS = {
+	White = BrickColor.White(),
+	Gray = BrickColor.Gray(),
+	DarkGray = BrickColor.DarkGray(),
+	Black = BrickColor.Black(),
+	Red = BrickColor.Red(),
+	Yellow = BrickColor.Yellow(),
+	Green = BrickColor.Green(),
+	Blue = BrickColor.Blue(),
+}
+
+local MATERIAL_PHYISCAL_PROPS: { [Enum.Material]: string } = {}
+
+do
+	for _, material in ipairs(Enum.Material:GetEnumItems()) do
+		local materialProps = PhysicalProperties.new(material)
+		MATERIAL_PHYISCAL_PROPS[material] = tostring(materialProps)
+	end
+end
+
+local FORMAT_MAP
+FORMAT_MAP = {
+	Color3Format = {
+		Full = function(value: Color3)
+			local red = clamp(value.R, 0, 1)
+			local green = clamp(value.G, 0, 1)
+			local blue = clamp(value.B, 0, 1)
+
+			red = FormatNumber(red)
+			green = FormatNumber(green)
+			blue = FormatNumber(blue)
+
+			if red == 0 and green == 0 and blue == 0 then
+				return "Color3.new()"
+			end
+
+			return fmt("Color3.new(%s, %s, %s)", red, green, blue)
+		end,
+
+		Hex = function(value: Color3)
+			local hex: string = (value :: any):ToHex()
+			return fmt('Color3.fromHex("#%s")', hex:upper())
+		end,
+
+		RGB = function(value: Color3)
+			local red = clamp(value.R * 255, 0, 255)
+			local green = clamp(value.G * 255, 0, 255)
+			local blue = clamp(value.B * 255, 0, 255)
+
+			return fmt("Color3.fromRGB(%.0f, %.0f, %.0f)", red, green, blue)
+		end,
+
+		HSV = function(value: Color3)
+			local hsv = { value:ToHSV() }
+
+			local h = clamp(hsv[1], 0, 1)
+			local s = clamp(hsv[2], 0, 1)
+			local v = clamp(hsv[3], 0, 1)
+
+			h = FormatNumber(h)
+			s = FormatNumber(s)
+			v = FormatNumber(v)
+
+			return fmt("Color3.fromHSV(%s, %s, %s)", h, s, v)
+		end,
+	},
+
+	UDim2Format = {
+		Full = function(value: UDim2)
+			local x = value.X.Scale
+			local y = value.Y.Scale
+			local ox = value.X.Offset
+			local oy = value.Y.Offset
+
+			if x == 0 and y == 0 and ox == 0 and oy == 0 then
+				return "UDim2.new()"
+			end
+
+			local xs = FormatNumber(x)
+			local ys = FormatNumber(y)
+
+			return fmt("UDim2.new(%s, %d, %s, %d)", xs, ox, ys, oy)
+		end,
+
+		Smart = function(value: UDim2)
+			local x = value.X.Scale
+			local y = value.Y.Scale
+			local ox = value.X.Offset
+			local oy = value.Y.Offset
+
+			local xs = FormatNumber(x)
+			local ys = FormatNumber(y)
+
+			if x == 0 and y == 0 and ox == 0 and oy == 0 then
+				return "UDim2.new()"
+			elseif x == 0 and y == 0 then
+				return fmt("UDim2.fromOffset(%.0f, %.0f)", ox, oy)
+			elseif ox == 0 and oy == 0 then
+				return fmt("UDim2.fromScale(%s, %s)", xs, ys)
+			end
+
+			return FORMAT_MAP.UDim2Format.Full(value)
+		end,
+	},
+
+	NumberRangeFormat = {
+		Full = function(value: NumberRange)
+			return fmt("NumberRange.new(%s, %s)", FormatNumber(value.Min), FormatNumber(value.Max))
+		end,
+
+		Smart = function(value: NumberRange)
+			if value.Max == value.Min then
+				return fmt("NumberRange.new(%s)", FormatNumber(value.Min))
+			end
+
+			return fmt("NumberRange.new(%s, %s)", FormatNumber(value.Min), FormatNumber(value.Max))
+		end,
+	},
+
+	EnumFormat = {
+		Full = tostring,
+
+		Number = function(value: EnumItem)
+			return value.Value
+		end,
+
+		String = function(value: EnumItem)
+			return fmt("%q", value.Name)
+		end,
+	},
+
+	NormalIdConstructor = {
+		Full = function(value: Axes | Faces, className: string)
+			local axes = {}
+
+			for _, normalId in ipairs(Enum.NormalId:GetEnumItems()) do
+				if value[normalId.Name] then
+					table.insert(axes, FORMAT_MAP.EnumFormat.Full(normalId))
+				end
+			end
+
+			return fmt("%s.new(%s)", className, table.concat(axes, ", "))
+		end,
+	},
+
+	BrickColorFormat = {
+		Name = function(value: BrickColor)
+			return fmt("BrickColor.new(%q)", tostring(value))
+		end,
+
+		RGB = function(value: BrickColor)
+			return fmt(
+				"BrickColor.new(%s, %s, %s)",
+				FormatNumber(value.r),
+				FormatNumber(value.g),
+				FormatNumber(value.b)
+			)
+		end,
+
+		Number = function(value: BrickColor)
+			return fmt("BrickColor.new(%d)", value.Number)
+		end,
+
+		Color3 = function(value: BrickColor, options: CodifyInstanceOptions?)
+			local FormatColor3 = FORMAT_MAP.Color3Format[options and options.Color3Format or "Smart"]
+			return fmt("BrickColor3.new(%s)", FormatColor3(value.Color))
+		end,
+
+		Smart = function(value: BrickColor)
+			for methodName, color in pairs(SHORT_BRICKCOLORS) do
+				if value == color then
+					return fmt("BrickColor.%s()", methodName)
+				end
+			end
+
+			return FORMAT_MAP.BrickColorFormat.Name(value)
+		end,
+	},
+
+	PhysicalPropertiesFormat = {
+		Full = function(value: PhysicalProperties)
+			local props = {
+				FormatNumber(value.Density),
+				FormatNumber(value.Friction),
+				FormatNumber(value.Elasticity),
+				FormatNumber(value.FrictionWeight),
+				FormatNumber(value.ElasticityWeight),
+			}
+
+			return fmt("PhysicalProperties.new(%s)", table.concat(props, ", "))
+		end,
+
+		Smart = function(value: PhysicalProperties)
+			local propsString = tostring(value)
+
+			for material, materialPropsString in pairs(MATERIAL_PHYISCAL_PROPS) do
+				if propsString == materialPropsString then
+					return fmt("PhysicalProperties.new(%s)", FORMAT_MAP.EnumFormat.Full(material))
+				end
+			end
+
+			return FORMAT_MAP.PhysicalPropertiesFormat.Full(value)
+		end,
+	},
+
+	UDimFormat = {
+		Full = function(value: UDim)
+			return fmt("UDim.new(%s, %s)", FormatNumber(value.Scale), FormatNumber(value.Offset))
+		end,
+	},
+
+	CFrameFormat = {
+		Full = function(value: CFrame)
+			return fmt("CFrame.new(%s)", tostring(value))
+		end,
+	},
+
+	VectorFormat = {
+		Full = function(value: Vector2 | Vector3 | Vector2int16 | Vector3int16)
+			local elements = tostring(value):split(", ")
+
+			for index, element in ipairs(elements) do
+				elements[index] = FormatNumber(tonumber(element))
+			end
+
+			return fmt("%s.new(%s)", typeof(value), table.concat(elements, ", "))
+		end,
+	},
+
+	FontFormat = {
+		Full = function(instance: GuiTextObject, options: CodifyInstanceOptions): string
+			local value = instance.FontFace
+
+			local isDefaultStyle = value.Style == Enum.FontStyle.Normal
+			local isDefaultWeight = value.Weight == Enum.FontWeight.Regular
+
+			if isDefaultStyle and isDefaultWeight then
+				return fmt("Font.new(%q)", value.Family)
+			end
+
+			local baseIndent = rep(options.TabCharacter, options.Indent)
+			local propIndent = rep(options.TabCharacter, options.Indent + 1)
+
+			local fontProps = {
+				fmt("%q", value.Family),
+				fmt("Enum.FontWeight.%s", value.Weight.Name),
+				fmt("Enum.FontStyle.%s", value.Style.Name),
+			}
+
+			return fmt(
+				"Font.new(\n%s%s,\n%s%s,\n%s%s\n%s)",
+				propIndent,
+				fontProps[1],
+				propIndent,
+				fontProps[2],
+				propIndent,
+				fontProps[3],
+				baseIndent
+			)
+		end,
+
+		Smart = function(instance: GuiTextObject, options: CodifyInstanceOptions): string
+			if instance.Font == Enum.Font.Unknown then
+				return FORMAT_MAP.FontFormat.Full(instance, options)
+			end
+
+			return fmt("Font.fromEnum(Enum.Font.%s)", instance.Font.Name)
+		end,
+	},
+}
+
+local function SerialiseColorSequence(sequence: ColorSequence, options: CodifyInstanceOptions)
+	local result = {}
+
+	local baseIndent = rep(options.TabCharacter, options.Indent)
+	local propIndent = rep(options.TabCharacter, options.Indent + 1)
+
+	for _, keypoint in ipairs(sequence.Keypoints) do
+		local value = keypoint.Value
+		local time = keypoint.Time
+
+		local valueString = FORMAT_MAP.Color3Format[options.Color3Format](value)
+		local timeString = FormatNumber(time)
+
+		table.insert(result, fmt("%sColorSequenceKeypoint.new(%s, %s)", propIndent, timeString, valueString))
+	end
+
+	local resultString = table.concat(result, ",\n")
+
+	return fmt("ColorSequence.new({\n%s,\n%s})", resultString, baseIndent)
+end
+
+local function SerialiseNumberSequence(sequence: NumberSequence, options: CodifyInstanceOptions)
+	local result = {}
+
+	local baseIndent = rep(options.TabCharacter, options.Indent)
+	local propIndent = rep(options.TabCharacter, options.Indent + 1)
+
+	for _, keypoint in ipairs(sequence.Keypoints) do
+		local envelope = keypoint.Envelope
+		local value = keypoint.Value
+		local time = keypoint.Time
+
+		local valueString = FormatNumber(value)
+		local timeString = FormatNumber(time)
+
+		if envelope == 0 then
+			table.insert(result, fmt("%sNumberSequenceKeypoint.new(%s, %s)", propIndent, timeString, valueString))
+		else
+			local envelopeString = FormatNumber(envelope)
+
+			table.insert(
+				result,
+				fmt("%sNumberSequenceKeypoint.new(%s, %s, %s)", propIndent, timeString, valueString, envelopeString)
+			)
+		end
+	end
+
+	local resultString = table.concat(result, ",\n")
+
+	return fmt("NumberSequence.new({\n%s,\n%s})", resultString, baseIndent)
+end
+
+local function SerialiseProperty(instance: Instance, property: string, options: CodifyInstanceOptions)
+	local value = (instance :: any)[property]
+	local valueTypeOf = typeof(value)
+	local valueType = type(value)
+
+	if valueTypeOf == "Color3" then
+		return FORMAT_MAP.Color3Format[options.Color3Format or "Hex"](value)
+	elseif valueTypeOf == "BrickColor" then
+		return FORMAT_MAP.BrickColorFormat[options.BrickColorFormat or "Smart"](value)
+	elseif valueTypeOf == "UDim" then
+		return FORMAT_MAP.UDimFormat.Full(value)
+	elseif valueTypeOf == "UDim2" then
+		return FORMAT_MAP.UDim2Format[options.UDim2Format or "Smart"](value)
+	elseif valueTypeOf == "NumberRange" then
+		return FORMAT_MAP.NumberRangeFormat[options.NumberRangeFormat or "Smart"](value)
+	elseif valueTypeOf == "EnumItem" then
+		return FORMAT_MAP.EnumFormat[options.EnumFormat or "Full"](value)
+	elseif valueTypeOf == "Axes" then
+		return FORMAT_MAP.NormalIdConstructor.Full(value, "Axes")
+	elseif valueTypeOf == "Faces" then
+		return FORMAT_MAP.NormalIdConstructor.Full(value, "Faces")
+	elseif valueTypeOf == "PhysicalProperties" then
+		return FORMAT_MAP.PhysicalPropertiesFormat[options.PhysicalPropertiesFormat or "Smart"](value)
+	elseif valueTypeOf == "CFrame" then
+		return FORMAT_MAP.CFrameFormat.Full(value)
+	elseif valueTypeOf == "ColorSequence" then
+		return SerialiseColorSequence(value, options)
+	elseif valueTypeOf == "NumberSequence" then
+		return SerialiseNumberSequence(value, options)
+	elseif valueTypeOf == "Font" then
+		return FORMAT_MAP.FontFormat[options.FontFormat or "Full"](instance, options)
+	elseif valueTypeOf == "Instance" then
+		return nil
+	elseif valueType == "vector" or valueTypeOf:match("Vector%d") then
+		return FORMAT_MAP.VectorFormat.Full(value)
+	elseif valueTypeOf == "number" then
+		return FormatNumber(value)
+	elseif valueTypeOf == "string" then
+		local isMultiline = value:match("\n")
+
+		if isMultiline then
+			return fmt("[[%s]]", value:gsub("]]", "]\\]"))
+		end
+
+		return fmt("%q", value)
+	elseif valueType == "userdata" then
+		return fmt("%s.new(%s)", valueTypeOf, tostring(value))
+	end
+
+	return tostring(value)
+end
+
+return {
+	SerialiseProperty = SerialiseProperty,
+}
+]]></string>
+          </Properties>
+        </Item>
+      </Item>
+      <Item class="ModuleScript" referent="82">
+        <Properties>
+          <string name="Name">HighlighterManager</string>
+          <string name="Source"><![CDATA[local Studio = settings():GetService("Studio") :: Studio
+local Plugin = script.Parent.Parent
+
+local Highlighter = require(Plugin.Packages.Highlighter)
+
+local Manager = {}
+Manager.__index = Manager
+
+function Manager.new(plugin: Plugin)
+	local self = setmetatable({}, Manager)
+
+	self.plugin = plugin
+	self.highlighter = Highlighter
+
+	self:UpdateColorScheme()
+
+	Studio.ThemeChanged:Connect(function()
+		self:UpdateColorScheme()
+	end)
+
+	return self
+end
+
+function Manager:UpdateColorScheme()
+	local theme = Studio.Theme :: StudioTheme
+
+	self.highlighter.setTokenColors({
+		background = theme:GetColor(Enum.StudioStyleGuideColor.ScriptBackground),
+		iden = theme:GetColor(Enum.StudioStyleGuideColor.ScriptText),
+		keyword = theme:GetColor(Enum.StudioStyleGuideColor.ScriptKeyword),
+		builtin = theme:GetColor(Enum.StudioStyleGuideColor.ScriptBuiltInFunction),
+		string = theme:GetColor(Enum.StudioStyleGuideColor.ScriptString),
+		number = theme:GetColor(Enum.StudioStyleGuideColor.ScriptNumber),
+		comment = theme:GetColor(Enum.StudioStyleGuideColor.ScriptComment),
+		operator = theme:GetColor(Enum.StudioStyleGuideColor.ScriptOperator),
+	})
+end
+
+return Manager
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="83">
+        <Properties>
+          <string name="Name">HttpPromise</string>
+          <string name="Source"><![CDATA[local HttpService = game:GetService("HttpService")
+local Plugin = script.Parent.Parent
+
+local Promise = require(Plugin.Packages.Promise)
+local Sift = require(Plugin.Packages.Sift)
+local String = require(script.Parent.String)
+
+export type RequestAsyncOptions = {
+	method: string?,
+	headers: { [string]: string | number | boolean }?,
+	body: string?,
+	timeout: number?,
+	retries: number?,
+	retryDelay: number?,
+	resolve2xxOnly: boolean?,
+	cache: boolean | number?,
+}
+
+type URL = {
+	protocol: string,
+	domain: string,
+	path: string?,
+}
+
+type CacheEntry = {
+	content: any?,
+	expires: number,
+}
+
+type ICacheDictionary = {
+	[string]: {
+		[string]: CacheEntry,
+	},
+}
+
+local APPROVED_DOMAINS: { [string]: boolean } = {}
+local CACHED_DATA: ICacheDictionary = {}
+
+local SENSIBLE_DEFAULT_CACHE = 300
+
+local DEFAULT_OPTIONS: RequestAsyncOptions = {
+	method = "GET",
+	headers = nil,
+	body = nil,
+	timeout = 15,
+	retries = 0,
+	retryDelay = 10,
+	resolve2xxOnly = false,
+	cache = true,
+}
+
+local function ParseURL(url: string): URL
+	local domain, path = url:match("^%w+://([^/]+)([^#]*)")
+	local protocol = url:match("^(%w+)://")
+
+	return {
+		protocol = protocol or "https",
+		domain = domain:lower(),
+		path = path,
+	}
+end
+
+local function FetchCachedData(url: string): any?
+	local URL = ParseURL(url)
+
+	if CACHED_DATA[URL.domain] then
+		local entry = CACHED_DATA[URL.domain][URL.path]
+
+		if entry and entry.expires > os.time() then
+			return entry.content
+		end
+
+		CACHED_DATA[URL.domain][URL.path] = nil
+	end
+
+	return nil
+end
+
+local function ParseResponseHeaderCSV(header: string)
+	return Sift.Array.reduce(header:split(","), function(reduction, value)
+		local kvPair = value:split("=")
+
+		kvPair[1] = String.Trim(kvPair[1]):lower()
+
+		if kvPair[2] ~= nil then
+			local kvValue = String.Trim(kvPair[2])
+
+			if tonumber(kvValue) then
+				kvValue = tonumber(kvValue)
+			end
+
+			kvPair[2] = kvValue
+		else
+			kvPair[2] = true
+		end
+
+		reduction[kvPair[1]] = kvPair[2]
+
+		return reduction
+	end, {})
+end
+
+local function GetHeaderContent(headers, key: string): string?
+	key = key:lower()
+
+	for headerKey, headerValue in pairs(headers) do
+		if key == headerKey:lower() then
+			return headerValue
+		end
+	end
+
+	return nil
+end
+
+local function PromptDomainApproval(url: string)
+	local URL = ParseURL(url)
+	local status = APPROVED_DOMAINS[URL.domain]
+
+	if status == true then
+		return Promise.resolve()
+		-- elseif status == false then
+		-- return Promise.reject("User declined permission for domain: " .. domain)
+	end
+
+	return Promise.new(function(resolve, reject)
+		task.spawn(function()
+			local ok, response = pcall(HttpService.RequestAsync, HttpService, {
+				Method = "OPTIONS",
+				Url = URL.protocol .. "://" .. URL.domain,
+			})
+
+			APPROVED_DOMAINS[URL.domain] = ok
+
+			if not ok then
+				reject(response)
+				return
+			end
+
+			resolve()
+		end)
+	end)
+end
+
+local function RequestAsync(url: string, options: RequestAsyncOptions?)
+	local cachedData = FetchCachedData(url)
+
+	if cachedData then
+		return Promise.resolve(cachedData)
+	end
+
+	local config = Sift.Dictionary.merge(DEFAULT_OPTIONS, options) :: RequestAsyncOptions
+	local URL = ParseURL(url)
+
+	return PromptDomainApproval(url):andThen(function()
+		local httpPromise = Promise.new(function(resolve, reject)
+			task.spawn(function()
+				local ok, response = pcall(HttpService.RequestAsync, HttpService, {
+					Url = url,
+					Method = config.method,
+					Headers = config.headers,
+					Body = config.body,
+				})
+
+				if not ok then
+					reject(response, response)
+					return
+				end
+
+				if config.resolve2xxOnly and not response.Success then
+					reject(response.StatusMessage, response)
+					return
+				end
+
+				local cacheHeader = GetHeaderContent(response.Headers, "cache-control")
+
+				if config.cache or (config.cache and cacheHeader ~= nil) then
+					local cachePolicy = ParseResponseHeaderCSV(cacheHeader)
+					local shouldCache = config.cache or not (cachePolicy["no-cache"] and cachePolicy["no-store"])
+
+					if shouldCache then
+						local maxAge = if type(config.cache) == "number"
+							then if config.cache < 0 then math.huge else config.cache
+							elseif cachePolicy["max-age"] then cachePolicy["max-age"]
+							else SENSIBLE_DEFAULT_CACHE
+
+						if maxAge then
+							local expires = os.time() + maxAge
+
+							CACHED_DATA[URL.domain] = CACHED_DATA[URL.domain] or {}
+							CACHED_DATA[URL.domain][URL.path] = {
+								content = response.Body,
+								expires = expires,
+							}
+						end
+					end
+				end
+
+				resolve(response.Body, response)
+			end)
+		end)
+
+		if config.timeout then
+			local timeout = if type(config.timeout) == "number"
+				then if config.timeout < 0 then math.huge else config.timeout
+				else DEFAULT_OPTIONS.timeout
+
+			httpPromise = httpPromise:timeout(timeout, "Request timed out")
+		end
+
+		if config.retries then
+			local retries = if type(config.retries) == "number" and config.retries < 0
+				then config.retries
+				else DEFAULT_OPTIONS.retries
+
+			local retryDelay = if type(config.retryDelay) == "number" and config.retryDelay > 0
+				then config.retryDelay
+				else nil
+
+			local retryablePromise = function()
+				return httpPromise
+			end
+
+			if retryDelay then
+				httpPromise = Promise.retryWithDelay(retryablePromise, retries, retryDelay)
+			else
+				httpPromise = Promise.retry(retryablePromise, retries)
+			end
+		end
+
+		return httpPromise
+	end)
+end
+
+local function RequestJsonAsync(url: string, options: RequestAsyncOptions?)
+	return RequestAsync(url, options):andThen(function(body, response)
+		local ok, data = pcall(HttpService.JSONDecode, HttpService, body)
+
+		if not ok then
+			return Promise.reject(data, response)
+		end
+
+		return data, response
+	end)
+end
+
+return {
+	RequestAsync = RequestAsync,
+	RequestJsonAsync = RequestJsonAsync,
+}
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="84">
+        <Properties>
+          <string name="Name">Properties</string>
+          <string name="Source"><![CDATA[local plugin = script:FindFirstAncestorOfClass("Plugin")
+local PluginRoot = script.Parent.Parent
+local RobloxVersion = version()
+
+local HttpPromise = require(PluginRoot.Lib.HttpPromise)
+local Promise = require(PluginRoot.Packages.Promise)
+local Sift = require(PluginRoot.Packages.Sift)
+
+local PLUGIN_CACHE_KEY = "API_DUMP_CACHE"
+
+local Properties = {}
+
+local IGNORED_PROPERTIES = {
+	Classes = {
+		GuiObject = {
+			"Font",
+		},
+	},
+	Global = {
+		"Parent",
+	},
+}
+
+function Properties.FetchDumpFromPluginCache()
+	local storedValue = plugin:GetSetting(PLUGIN_CACHE_KEY)
+
+	if not storedValue then
+		return Promise.resolve()
+	end
+
+	if storedValue.Version ~= RobloxVersion then
+		return Promise.resolve()
+	end
+
+	return Promise.resolve(storedValue)
+end
+
+function Properties.FetchLatestVersionHash()
+	return HttpPromise.RequestAsync("https://s3.amazonaws.com/setup.roblox.com/versionQTStudio", {
+		cache = -1,
+	}):andThen(function(version)
+		local hash = version:match("version%-(%x+)")
+		return hash
+	end)
+end
+
+function Properties.FetchVersionHash(version: string?)
+	version = if version then version else RobloxVersion
+
+	local deployVersion = version:gsub("%.", ", ")
+
+	return HttpPromise.RequestAsync("https://s3.amazonaws.com/setup.roblox.com/DeployHistory.txt", {
+		cache = -1,
+	}):andThen(function(history)
+		local deployments = history:split("\n")
+
+		for lineNumber = #deployments, 1, -1 do
+			local line = deployments[lineNumber]
+
+			if line:find(deployVersion) then
+				return assert(line:match("version%-(%x+)"), "Unable to find version hash in line: " .. line)
+			end
+
+			if lineNumber >= 128 then
+				break
+			end
+		end
+
+		return Promise.reject("Unable to find version hash for " .. deployVersion)
+	end)
+end
+
+function Properties.FetchVersionWithFallback(version: string?)
+	return Properties.FetchDumpFromPluginCache():andThen(function(cachedDump)
+		if cachedDump and cachedDump.Version == RobloxVersion then
+			return Promise.resolve(cachedDump.VersionHash)
+		end
+
+		return Properties.FetchVersionHash(version):catch(function()
+			return Properties.FetchLatestVersionHash()
+		end)
+	end)
+end
+
+function Properties.FetchAPIDump(hash: string)
+	return Properties.FetchDumpFromPluginCache():andThen(function(cachedDump)
+		if cachedDump and cachedDump.VersionHash == hash then
+			return cachedDump.Data
+		end
+
+		return HttpPromise.RequestJsonAsync(
+			"https://s3.amazonaws.com/setup.roblox.com/version-" .. hash .. "-API-Dump.json",
+			{
+				cache = -1,
+			}
+		)
+			:andThen(function(apiDump)
+				plugin:SetSetting(PLUGIN_CACHE_KEY, {
+					Version = RobloxVersion,
+					VersionHash = hash,
+					Data = apiDump,
+				})
+
+				return apiDump
+			end)
+	end)
+end
+
+local function FindClassEntry(dump, class: string)
+	local entryIndex = Sift.Array.findWhere(dump.Classes, function(classEntry)
+		return classEntry.Name == class
+	end)
+
+	return dump.Classes[entryIndex]
+end
+
+function Properties.GetClassAncestry(class: string)
+	return Properties.FetchVersionWithFallback()
+		:andThen(function(version)
+			return Properties.FetchAPIDump(version)
+		end)
+		:andThen(function(dump)
+			local ancestorClasses = { FindClassEntry(dump, class) }
+
+			while ancestorClasses[#ancestorClasses].Superclass ~= "<<<ROOT>>>" do
+				table.insert(ancestorClasses, FindClassEntry(dump, ancestorClasses[#ancestorClasses].Superclass))
+			end
+
+			return ancestorClasses
+		end)
+end
+
+function Properties.GetIgnoredPropertyNames(class: string)
+	return Properties.GetClassAncestry(class):andThen(function(ancestry)
+		local ignoredProperties = {}
+
+		for _, ancestor in ipairs(ancestry) do
+			local ignoreList = IGNORED_PROPERTIES.Classes[ancestor.Name]
+
+			if ignoreList then
+				table.insert(ignoredProperties, ignoreList)
+			end
+		end
+
+		for _, globalProperty in ipairs(IGNORED_PROPERTIES.Global) do
+			table.insert(ignoredProperties, globalProperty)
+		end
+
+		return Sift.Array.flatten(ignoredProperties, 1)
+	end)
+end
+
+function Properties.GetPropertyList(class: string)
+	return Properties.GetClassAncestry(class):andThen(function(ancestry)
+		local success, ignoredProperties = Properties.GetIgnoredPropertyNames(class):await()
+		local properties = {}
+
+		for _, ancestor in ipairs(ancestry) do
+			local propertyMembers = Sift.Array.filter(ancestor.Members, function(member)
+				if member.MemberType ~= "Property" then
+					return false
+				end
+
+				if member.Security.Read ~= "None" or member.Security.Write ~= "None" then
+					return false
+				end
+
+				if member.Tags then
+					local tagList = { "ReadOnly", "Deprecated", "Hidden", "NotScriptable" }
+
+					for _, tag in ipairs(member.Tags) do
+						if table.find(tagList, tag) then
+							return false
+						end
+					end
+				end
+
+				return true
+			end)
+
+			for _, property in ipairs(propertyMembers) do
+				if success and ignoredProperties and table.find(ignoredProperties, property.Name) then
+					continue
+				end
+
+				table.insert(properties, property.Name)
+			end
+		end
+
+		return properties
+	end)
+end
+
+function Properties.GetChangedProperties(instance: Instance)
+	return Properties.GetPropertyList(instance.ClassName):andThen(function(properties)
+		local newInstance = Instance.new(instance.ClassName)
+		local changedProps = {}
+
+		for _, property in ipairs(properties) do
+			if newInstance[property] ~= instance[property] then
+				table.insert(changedProps, property)
+			end
+		end
+
+		newInstance:Destroy()
+
+		return changedProps
+	end)
+end
+
+return Properties
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="85">
+        <Properties>
+          <string name="Name">SelectionManager</string>
+          <string name="Source"><![CDATA[local Selection = game:GetService("Selection")
+
+export type SelectionManagerOptions = {
+	classFilter: { string | (Instance) -> boolean }?,
+}
+
+local Manager = {}
+Manager.__index = Manager
+
+function Manager.new(plugin: Plugin, options: SelectionManagerOptions?)
+	local self = setmetatable({}, Manager)
+	local config = options or {}
+
+	self._changeEvent = Instance.new("BindableEvent")
+	self.Changed = self._changeEvent.Event
+
+	self.plugin = plugin
+	self.classFilter = config.classFilter or {}
+
+	Selection.SelectionChanged:Connect(function()
+		local selection = self:GetCurrentSelection()
+		self._changeEvent:Fire(selection)
+	end)
+
+	return self
+end
+
+function Manager:GetCurrentSelection(): Instance?
+	local ok, selection = pcall(function()
+		local selection = Selection:Get()[1]
+
+		if not selection then
+			return
+		end
+
+		if #self.classFilter == 0 then
+			return selection
+		end
+
+		local passesChecks = true
+
+		for _, class in ipairs(self.classFilter) do
+			if type(class) == "function" then
+				passesChecks = class(selection)
+			elseif type(class) == "string" then
+				passesChecks = selection:IsA(class)
+			end
+		end
+
+		if passesChecks then
+			return selection
+		end
+	end)
+
+	return if ok then selection else nil
+end
+
+return Manager
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="86">
+        <Properties>
+          <string name="Name">String</string>
+          <string name="Source"><![CDATA[local String = {}
+
+function String.Trim(value: string)
+	local result = value:match("^%s*(.-)%s*$")
+	return result
+end
+
+return String
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="87">
+        <Properties>
+          <string name="Name">UserSettingsManager</string>
+          <string name="Source"><![CDATA[local Plugin = script.Parent.Parent
+
+local Config = require(Plugin.Data.Config)
+local Actions = require(Plugin.Actions)
+
+local Manager = {}
+Manager.__index = Manager
+
+function Manager.new(plugin: Plugin, store)
+	local self = setmetatable({}, Manager)
+
+	self.plugin = plugin
+	self.store = store
+	self.key = "0e9eb429"
+	self.version = Config.version
+
+	self:RestoreSettings()
+
+	self.store.changed:connect(function(state, oldState)
+		if state.userSettings ~= oldState.userSettings then
+			self:SaveSettings()
+		end
+	end)
+
+	return self
+end
+
+function Manager:SaveSettings()
+	local state = self.store:getState()
+
+	self.plugin:SetSetting(self.key, {
+		version = self.version,
+		settings = state.userSettings,
+	})
+end
+
+function Manager:RestoreSettings()
+	local savedSettings = self.plugin:GetSetting(self.key)
+
+	if not (type(savedSettings) == "table" and savedSettings.settings) then
+		return
+	end
+
+	for key, value in pairs(savedSettings.settings) do
+		self.store:dispatch(Actions.SetSetting({
+			key = key,
+			value = value,
+		}))
+	end
+end
+
+return Manager
+]]></string>
+        </Properties>
+      </Item>
+    </Item>
+    <Item class="ModuleScript" referent="88">
+      <Properties>
+        <string name="Name">Reducer</string>
+        <string name="Source"><![CDATA[local TargetInstance = require(script.TargetInstance)
+local PluginMetadata = require(script.PluginMetadata)
+local UserSettings = require(script.UserSettings)
+local Attribution = require(script.Attribution)
+local Snippet = require(script.Snippet)
+
+return function(state, action)
+	state = state or {}
+
+	return {
+		targetInstance = TargetInstance(state.targetInstance, action),
+		pluginMeta = PluginMetadata(state.pluginMetadata, action),
+		userSettings = UserSettings(state.userSettings, action),
+		attribution = Attribution(state.attribution, action),
+		snippet = Snippet(state.snippet, action),
+	}
+end
+]]></string>
+      </Properties>
+      <Item class="ModuleScript" referent="89">
+        <Properties>
+          <string name="Name">Attribution</string>
+          <string name="Source"><![CDATA[local Sift = require(script.Parent.Parent.Packages.Sift)
+
+return function(state, action)
+	state = state or {
+		authors = {},
+		contributors = {},
+	}
+
+	if action.type == "SET_CONTRIBUTORS" then
+		assert(
+			type(action.payload) == "table" or action.payload == nil,
+			"SET_CONTRIBUTORS `action.payload` must be a table"
+		)
+
+		return Sift.Dictionary.merge(state, {
+			contributors = action.payload or {},
+		})
+	elseif action.type == "SET_AUTHORS" then
+		assert(type(action.payload) == "table" or action.payload == nil, "SET_AUTHORS `action.payload` must be a table")
+
+		return Sift.Dictionary.merge(state, {
+			authors = action.payload or {},
+		})
+	end
+
+	return state
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="90">
+        <Properties>
+          <string name="Name">PluginMetadata</string>
+          <string name="Source"><![CDATA[local Plugin = script.Parent.Parent
+local Sift = require(Plugin.Packages.Sift)
+
+local INIT_STATE = {
+	isDevMode = false,
+	build = "STABLE",
+}
+
+return function(state, action)
+	state = state or INIT_STATE
+
+	if action.type == "SET_PLUGIN_METADATA" then
+		return Sift.Dictionary.merge(state, action.payload)
+	end
+
+	return state
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="91">
+        <Properties>
+          <string name="Name">Snippet</string>
+          <string name="Source"><![CDATA[local Sift = require(script.Parent.Parent.Packages.Sift)
+
+local fmt = string.format
+
+local ERROR_TEMPLATES = {
+	SET_SNIPPET_PROCESSING = "SET_SNIPPET_PROCESSING `action.payload` must be a boolean, got %q (%s)",
+	SET_SNIPPET_CONTENT = {
+		BASE = "SET_SNIPPET_CONTENT `action.payload` must be a table, got %q (%s)",
+		NAME = "SET_SNIPPET_CONTENT `action.payload.name` must be a string, got %q (%s)",
+		CONTENT = "SET_SNIPPET_CONTENT `action.payload.content` must be a string, got %q (%s)",
+	},
+	SET_SNIPPET_ERROR = "SET_SNIPPET_ERROR `action.payload` must be a string | nil, got %q (%s)",
+}
+
+return function(state, action)
+	state = state or {
+		name = nil,
+		content = nil,
+		processing = false,
+		error = nil,
+	}
+
+	if action.type == "SET_SNIPPET_PROCESSING" then
+		assert(
+			type(action.payload) == "boolean",
+			fmt(ERROR_TEMPLATES.SET_SNIPPET_PROCESSING, tostring(action.payload), typeof(action.payload))
+		)
+
+		return Sift.Dictionary.merge(state, {
+			processing = action.payload,
+		})
+	elseif action.type == "SET_SNIPPET_CONTENT" then
+		assert(
+			type(action.payload) == "table",
+			fmt(ERROR_TEMPLATES.SET_SNIPPET_CONTENT.BASE, tostring(action.payload), typeof(action.payload))
+		)
+
+		assert(
+			type(action.payload.name) == "string",
+			fmt(ERROR_TEMPLATES.SET_SNIPPET_CONTENT.NAME, tostring(action.payload.name), typeof(action.payload.name))
+		)
+
+		assert(
+			type(action.payload.content) == "string",
+			fmt(
+				ERROR_TEMPLATES.SET_SNIPPET_CONTENT.CONTENT,
+				tostring(action.payload.content),
+				typeof(action.payload.content)
+			)
+		)
+
+		return Sift.Dictionary.merge(state, {
+			content = action.payload.content,
+			name = action.payload.name,
+		})
+	elseif action.type == "SET_SNIPPET_ERROR" then
+		assert(
+			type(action.payload) == "string" or type(action.payload) == "nil",
+			fmt(ERROR_TEMPLATES.SET_SNIPPET_ERROR, tostring(action.payload), typeof(action.payload))
+		)
+
+		return Sift.Dictionary.merge(state, {
+			error = action.payload or Sift.None,
+		})
+	end
+
+	return state
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="92">
+        <Properties>
+          <string name="Name">TargetInstance</string>
+          <string name="Source"><![CDATA[local function IsLargeInstance(instance: Instance?): boolean
+	local ok, size = pcall(function()
+		return #instance:GetDescendants()
+	end)
+
+	return ok and size >= 20
+end
+
+return function(state, action)
+	state = state or {
+		instance = nil,
+		large = false,
+	}
+
+	if action.type == "SET_TARGET_INSTANCE" then
+		local isLarge = IsLargeInstance(action.payload)
+
+		return {
+			instance = action.payload,
+			large = isLarge,
+		}
+	end
+
+	return state
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="93">
+        <Properties>
+          <string name="Name">UserSettings</string>
+          <string name="Source"><![CDATA[local Plugin = script.Parent.Parent
+
+local Sift = require(Plugin.Packages.Sift)
+local String = require(Plugin.Lib.String)
+local Enums = require(Plugin.Data.Enums)
+
+local DEFAULT_SETTINGS = {
+	syntaxHighlighting = true,
+	brickColorFormat = Enums.BrickColorFormat.Smart,
+	color3Format = Enums.Color3Format.RGB,
+	enumFormat = Enums.EnumFormat.Full,
+	framework = Enums.Framework.Regular,
+	namingScheme = Enums.NamingScheme.All,
+	numberRangeFormat = Enums.NumberRangeFormat.Smart,
+	physicalPropertiesFormat = Enums.PhysicalPropertiesFormat.Smart,
+	udim2Format = Enums.UDim2Format.Smart,
+	indentationUsesTabs = false,
+	indentationLength = 2,
+	fontFormat = Enums.FontFormat.Full,
+	parallelLuauGeneration = false,
+}
+
+return function(state, action)
+	state = state or Sift.Dictionary.copy(DEFAULT_SETTINGS)
+
+	if action.type == "SET_SETTING" then
+		assert(type(action.payload) == "table", "SET_SETTING `payload` must be a table")
+		assert(type(action.payload.key) == "string", "SET_SETTING `payload.key` must be a string")
+
+		if type(action.payload.value) == "string" then
+			local newValue = String.Trim(action.payload.value)
+
+			if #newValue == 0 then
+				newValue = DEFAULT_SETTINGS[action.payload.key] or Sift.None
+			end
+
+			action.payload.value = newValue
+		elseif action.payload.value ~= nil then
+			if action.payload.key == "indentationLength" then
+				assert(type(action.payload.value) == "number", "SET_SETTING `payload.value` must be a number")
+				action.payload.value = math.max(0, action.payload.value)
+			end
+		elseif action.payload.value == nil then
+			action.payload.value = Sift.None
+		end
+
+		return Sift.Dictionary.merge(state, {
+			[action.payload.key] = action.payload.value,
+		})
+	end
+
+	return state
+end
+]]></string>
+        </Properties>
+      </Item>
+    </Item>
+    <Item class="ModuleScript" referent="94">
+      <Properties>
+        <string name="Name">Thunks</string>
+        <string name="Source"><![CDATA[return {
+	DeterminePluginMetadata = require(script.DeterminePluginMetadata),
+	ExportSnippetToDevice = require(script.ExportSnippetToDevice),
+	FetchAuthors = require(script.FetchAuthors),
+	FetchContributors = require(script.FetchContributors),
+	GenerateSnippet = require(script.GenerateSnippet),
+}
+]]></string>
+      </Properties>
+      <Item class="ModuleScript" referent="95">
+        <Properties>
+          <string name="Name">DeterminePluginMetadata</string>
+          <string name="Source"><![CDATA[local PluginDebugService = game:GetService("PluginDebugService")
+local Plugin = script.Parent.Parent
+
+local Config = require(Plugin.Data.Config)
+local Actions = require(Plugin.Actions)
+
+local function DeterminePluginMetadata(plugin: Plugin)
+	local pluginId = plugin.Name:match("%d+$")
+	pluginId = tonumber(pluginId)
+
+	return function(store)
+		if pluginId == nil or plugin.Parent == PluginDebugService then
+			if plugin.Name:match("codify_dev_%x+") then
+				return store:dispatch(Actions.SetPluginMetadata({
+					build = "DEV",
+					isDevMode = true,
+				}))
+			else
+				-- Likely a local install (itch.io)...
+				return store:dispatch(Actions.SetPluginMetadata({
+					build = "STABLE",
+				}))
+			end
+		end
+
+		if pluginId == Config.pluginId.canary then
+			return store:dispatch(Actions.SetPluginMetadata({
+				build = "CANARY",
+			}))
+		end
+
+		if pluginId == Config.pluginId.preview then
+			return store:dispatch(Actions.SetPluginMetadata({
+				build = "PREVIEW",
+			}))
+		end
+
+		if pluginId == Config.pluginId.stable then
+			return store:dispatch(Actions.SetPluginMetadata({
+				build = "STABLE",
+			}))
+		end
+
+		store:dispatch(Actions.SetPluginMetadata({
+			build = "FORK",
+		}))
+	end
+end
+
+return DeterminePluginMetadata
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="96">
+        <Properties>
+          <string name="Name">ExportSnippetToDevice</string>
+          <string name="Source"><![CDATA[local ServerStorage = game:GetService("ServerStorage")
+local Selection = game:GetService("Selection")
+
+local Plugin = script.Parent.Parent
+
+local Promise = require(Plugin.Packages.Promise)
+
+local function PromptAndInsertModuleScript(props)
+	return Promise.try(function()
+		local module = Instance.new("ModuleScript")
+
+		if props then
+			for key, value in pairs(props) do
+				module[key] = value
+			end
+		end
+
+		return module
+	end)
+end
+
+local function ExportSnippetToDevice(plugin: Plugin)
+	return function(store)
+		local state = store:getState()
+
+		PromptAndInsertModuleScript({
+			Name = state.snippet.name,
+			Source = state.snippet.content,
+			Archivable = false,
+			Parent = ServerStorage,
+		})
+			:andThen(function(module: ModuleScript)
+				local activeSelection = Selection:Get()
+
+				Selection:Set({ module })
+				plugin:PromptSaveSelection(state.snippet.name)
+
+				Selection:Set(activeSelection)
+				module:Destroy()
+			end)
+			:catch(function() -- fail silently
+				return false
+			end)
+	end
+end
+
+return ExportSnippetToDevice
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="97">
+        <Properties>
+          <string name="Name">FetchAuthors</string>
+          <string name="Source"><![CDATA[local Players = game:GetService("Players")
+local Plugin = script.Parent.Parent
+
+local Promise = require(Plugin.Packages.Promise)
+local Sift = require(Plugin.Packages.Sift)
+
+local Config = require(Plugin.Data.Config)
+local Actions = require(Plugin.Actions)
+
+local USER_ID_CACHE = {}
+
+local function GetUsernameFromUserIdAsync(userId: number)
+	if USER_ID_CACHE[userId] then
+		return Promise.resolve(USER_ID_CACHE[userId])
+	end
+
+	return Promise.new(function(resolve, reject)
+		task.spawn(function()
+			local ok, username = pcall(Players.GetNameFromUserIdAsync, Players, userId)
+
+			if not ok then
+				reject(username)
+				return
+			end
+
+			USER_ID_CACHE[userId] = username
+
+			resolve(username)
+		end)
+	end)
+end
+
+local function FetchAuthors()
+	return function(store)
+		Promise.all(Sift.Array.map(Config.authors, function(author)
+			return Promise.retryWithDelay(GetUsernameFromUserIdAsync, 3, 30, author.userId)
+		end))
+			:andThen(function(authors)
+				store:dispatch(Actions.SetAuthors(authors))
+			end)
+			:catch(function() -- fail silently
+				return false
+			end)
+	end
+end
+
+return FetchAuthors
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="98">
+        <Properties>
+          <string name="Name">FetchContributors</string>
+          <string name="Source"><![CDATA[local Plugin = script.Parent.Parent
+
+local HttpPromise = require(Plugin.Lib.HttpPromise)
+local Sift = require(Plugin.Packages.Sift)
+local Actions = require(Plugin.Actions)
+
+local function FetchContributors(repo: string, authors: { string }?)
+	local repoOwner = repo:match("^[^/]+")
+
+	repoOwner = repoOwner and repoOwner:lower()
+	authors = Sift.Array.map(authors or {}, function(author)
+		return author:lower()
+	end)
+
+	return function(store)
+		HttpPromise.RequestJsonAsync("https://api.github.com/repos/" .. repo .. "/contributors?anon=1")
+			:andThen(function(data)
+				table.sort(data, function(a, b)
+					return a.contributions > b.contributions
+				end)
+
+				return Sift.Array.reduce(data, function(reduction, user)
+					local username = user.login or user.name
+
+					if username and not (username == repoOwner or table.find(authors, username)) then
+						table.insert(reduction, username)
+					end
+
+					return reduction
+				end, {})
+			end)
+			:andThen(function(contributors)
+				store:dispatch(Actions.SetContributors(contributors))
+			end)
+			:catch(function() -- fail silently
+				return false
+			end)
+	end
+end
+
+return FetchContributors
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="99">
+        <Properties>
+          <string name="Name">GenerateSnippet</string>
+          <string name="Source"><![CDATA[local Plugin = script.Parent.Parent
+
+local Promise = require(Plugin.Packages.Promise)
+
+local Codify = require(Plugin.Lib.Codify)
+local String = require(Plugin.Lib.String)
+local Actions = require(Plugin.Actions)
+
+local CodifyAsync = Promise.promisify(Codify)
+
+local function GenerateSnippet()
+	return function(store)
+		local state = store:getState()
+
+		if not state.targetInstance.instance or state.snippet.processing then
+			return
+		end
+
+		store:dispatch(Actions.SetSnippetProcessing(true))
+
+		local tabCharacter = if state.userSettings.indentationUsesTabs
+			then "\t"
+			else string.rep(" ", state.userSettings.indentationLength or 2)
+
+		CodifyAsync(state.targetInstance.instance, {
+				Framework = state.userSettings.framework,
+				CreateMethod = state.userSettings["createMethod" .. state.userSettings.framework],
+				Color3Format = state.userSettings.color3Format,
+				UDim2Format = state.userSettings.udim2Format,
+				NumberRangeFormat = state.userSettings.numberRangeFormat,
+				EnumFormat = state.userSettings.enumFormat,
+				NamingScheme = state.userSettings.namingScheme,
+				PhysicalPropertiesFormat = state.userSettings.physicalPropertiesFormat,
+				BrickColorFormat = state.userSettings.brickColorFormat,
+				ChildrenKey = state.userSettings["childrenKey" .. state.userSettings.framework],
+				TabCharacter = tabCharacter,
+				FontFormat = state.userSettings.fontFormat,
+				ParallelLuau = if task ~= nil
+						and task.synchronize ~= nil
+						and task.desynchronize ~= nil
+					then state.userSettings.parallelLuauGeneration
+					else false,
+			})
+			:andThen(function(snippet)
+				store:dispatch(Actions.SetSnippetContent({
+					name = state.targetInstance.instance.Name,
+					content = String.Trim(snippet),
+				}))
+
+				store:dispatch(Actions.SetSnippetError(nil))
+			end)
+			:catch(function(rejection)
+				local errorText = tostring(rejection.error)
+
+				warn(rejection)
+
+				store:dispatch(Actions.SetSnippetError(errorText))
+			end)
+			:finally(function()
+				store:dispatch(Actions.SetSnippetProcessing(false))
+			end)
+	end
+end
+
+return GenerateSnippet
+]]></string>
+        </Properties>
+      </Item>
+    </Item>
+    <Item class="Folder" referent="100">
+      <Properties>
+        <string name="Name">Packages</string>
+      </Properties>
+    </Item>
+  </Item>
+</roblox>
