@@ -111,6 +111,10 @@ This document contains the most up-to-date and actively maintained open-source l
 - https://github.com/arxkdev/ezVisualz
 - UIGradient and UIStroke effects made easy!
 
+### Roblox GUI Maker
+- https://robloxguimaker.dev/
+- AI prompt-to-GUI tool for drafting Roblox Studio UI layouts and Lua starter code.
+
 ### Plasma *(optional)*
 - https://github.com/matter-ecs/plasma
 - Alternative reactive UI framework.
@@ -269,5 +273,4 @@ This document contains the most up-to-date and actively maintained open-source l
 
 ---
 This list is open to contributions. New resources may be added, and updates are made regularly.
-
 
