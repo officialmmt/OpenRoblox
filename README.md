@@ -878,6 +878,14 @@ as security mechanisms.
 
 # 🧪 Testing & Quality
 
+## Roblox Ship Check
+
+MIT-licensed workflow, runnable Luau examples, and a report checker for reproducing one gameplay bug before and after a patch. The in-memory lab runs in a blank Roblox Studio place or with Lune. One use is recording the exact checkpoint sequence and expected respawn so a teammate can reproduce the same check after a change. [Repository, setup, and validation](https://github.com/Deworix/roblox-ship-check/tree/9fa6ab63196bb7b73b2d04c46df336f4a9baf9a9)
+
+**Status** Maintained community resource. The lab covers its own fixtures. Playtests and verification for a specific game run separately.
+
+---
+
 ## TestEZ
 
 TestEZ is a real Roblox testing framework, but its repository is archived.
